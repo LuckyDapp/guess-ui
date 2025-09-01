@@ -1,0 +1,281 @@
+.blockchain-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.blockchain-loader {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.blockchain-loader-small .blockchain-loader {
+  width: 80px;
+  height: 80px;
+}
+
+.blockchain-loader-large .blockchain-loader {
+  width: 160px;
+  height: 160px;
+}
+
+/* Blockchain Nodes */
+.blockchain-nodes {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.node {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, #64b5f6, #1976d2, #0d47a1);
+  border-radius: 50%;
+  box-shadow:
+    0 0 20px rgba(100, 181, 246, 0.8),
+    0 0 40px rgba(100, 181, 246, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  animation: nodePulse 2s ease-in-out infinite, nodeGlow 3s ease-in-out infinite;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.blockchain-loader-small .node {
+  width: 8px;
+  height: 8px;
+}
+
+.blockchain-loader-large .node {
+  width: 16px;
+  height: 16px;
+}
+
+.node-1 {
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 0s;
+}
+
+.node-2 {
+  top: 50%;
+  right: 10%;
+  animation-delay: 0.4s;
+}
+
+.node-3 {
+  bottom: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 0.8s;
+}
+
+.node-4 {
+  top: 50%;
+  left: 10%;
+  animation-delay: 1.2s;
+}
+
+.node-5 {
+  top: 10%;
+  left: 20%;
+  animation-delay: 1.6s;
+}
+
+/* Blockchain Chains */
+.blockchain-chains {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.chain {
+  position: absolute;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #64b5f6, #1976d2, #64b5f6, transparent);
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(100, 181, 246, 0.6);
+  animation: chainFlow 3s linear infinite, chainPulse 2s ease-in-out infinite;
+}
+
+.chain-1 {
+  top: 35%;
+  left: 30%;
+  width: 40%;
+  animation-delay: 0s;
+}
+
+.chain-2 {
+  top: 50%;
+  left: 30%;
+  width: 60%;
+  animation-delay: 1s;
+}
+
+.chain-3 {
+  top: 65%;
+  left: 30%;
+  width: 40%;
+  animation-delay: 2s;
+}
+
+.chain-4 {
+  top: 25%;
+  left: 20%;
+  width: 30%;
+  transform: rotate(45deg);
+  animation-delay: 0.5s;
+}
+
+/* Particles */
+.particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: linear-gradient(45deg, #64b5f6, #1976d2);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(100, 181, 246, 0.8);
+  animation: particleFloat 4s ease-in-out infinite, particleGlow 2s ease-in-out infinite alternate;
+}
+
+.particle-1 {
+  top: 30%;
+  left: 25%;
+  animation-delay: 0s;
+}
+
+.particle-2 {
+  top: 70%;
+  right: 25%;
+  animation-delay: 1s;
+}
+
+.particle-3 {
+  top: 20%;
+  right: 30%;
+  animation-delay: 2s;
+}
+
+.particle-4 {
+  bottom: 30%;
+  left: 20%;
+  animation-delay: 0.5s;
+}
+
+.particle-5 {
+  top: 60%;
+  left: 15%;
+  animation-delay: 1.5s;
+}
+
+.particle-6 {
+  bottom: 20%;
+  right: 20%;
+  animation-delay: 2.5s;
+}
+
+/* Animations */
+@keyframes nodePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes nodeGlow {
+  0% {
+    box-shadow:
+      0 0 20px rgba(100, 181, 246, 0.8),
+      0 0 40px rgba(100, 181, 246, 0.4),
+      inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  }
+  100% {
+    box-shadow:
+      0 0 30px rgba(100, 181, 246, 1),
+      0 0 60px rgba(100, 181, 246, 0.6),
+      inset 0 1px 2px rgba(255, 255, 255, 0.5);
+  }
+}
+
+@keyframes chainFlow {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+
+@keyframes particleFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-10px) rotate(90deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-5px) rotate(180deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-15px) rotate(270deg);
+    opacity: 0.6;
+  }
+}
+
+/* Message animation */
+.blockchain-loader-message {
+  animation: messageFade 2s ease-in-out infinite;
+}
+
+@keyframes messageFade {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .blockchain-loader-container {
+    padding: 15px;
+  }
+
+  .blockchain-loader {
+    width: 100px;
+    height: 100px;
+  }
+
+  .blockchain-loader-small .blockchain-loader {
+    width: 60px;
+    height: 60px;
+  }
+
+  .blockchain-loader-large .blockchain-loader {
+    width: 140px;
+    height: 140px;
+  }
+}

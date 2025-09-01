@@ -1,0 +1,253 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+   padding: 0;
+   margin: 0;
+   font-family: Poppins, Roboto, Arial, sans-serif;
+   color: white;
+   background: linear-gradient(135deg, #101010 0%, #1a1a1a 50%, #101010 100%);
+   background-attachment: fixed;
+   min-height: 100vh;
+   overflow-x: hidden;
+}
+
+.content-block {
+   background: linear-gradient(135deg, rgba(32, 33, 37, 0.95) 0%, rgba(25, 27, 31, 0.95) 100%) !important;
+   backdrop-filter: blur(20px);
+   border: 1px solid rgba(255, 255, 255, 0.1);
+   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Enhanced responsive design */
+@media (max-width: 768px) {
+   .content-block {
+       margin: 0 10px;
+       border-radius: 16px !important;
+   }
+
+   body {
+       font-size: 14px;
+   }
+}
+
+@media (max-width: 480px) {
+   .content-block {
+       margin: 0 5px;
+       border-radius: 12px !important;
+   }
+
+   body {
+       font-size: 13px;
+   }
+}
+
+/* Smooth animations */
+* {
+   transition: all 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+   width: 8px;
+}
+
+::-webkit-scrollbar-track {
+   background: rgba(255, 255, 255, 0.1);
+   border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+   background: linear-gradient(135deg, #64b5f6, #1976d2);
+   border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+   background: linear-gradient(135deg, #1976d2, #64b5f6);
+}
+
+/* Enhanced button styles */
+.MuiButton-root {
+   border-radius: 12px !important;
+   text-transform: none !important;
+   font-weight: 600 !important;
+   transition: all 0.3s ease !important;
+}
+
+.MuiButton-root:hover {
+   transform: translateY(-2px) !important;
+   box-shadow: 0 6px 20px rgba(100, 181, 246, 0.3) !important;
+}
+
+/* AppBar customizations */
+.MuiAppBar-root {
+   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Toolbar spacing */
+.MuiToolbar-root {
+   min-height: 64px !important;
+}
+
+/* Responsive navigation */
+@media (max-width: 768px) {
+   .MuiToolbar-root {
+       min-height: 56px !important;
+       padding-left: 16px !important;
+       padding-right: 16px !important;
+   }
+
+   .MuiAppBar-root .MuiTypography-h6 {
+       font-size: 1rem !important;
+   }
+
+   .MuiAppBar-root .MuiButton-root {
+       min-width: auto !important;
+       padding: 6px 12px !important;
+       font-size: 0.75rem !important;
+   }
+}
+
+@media (max-width: 600px) {
+   .MuiToolbar-root {
+       flex-direction: column !important;
+       gap: 8px !important;
+       align-items: stretch !important;
+       padding: 8px 16px !important;
+   }
+
+   .MuiAppBar-root .MuiBox-root:first-child {
+       order: 1;
+       justify-content: center;
+   }
+
+   .MuiAppBar-root .MuiBox-root:nth-child(2) {
+       order: 2;
+       justify-content: center;
+   }
+
+   .MuiAppBar-root .MuiBox-root:last-child {
+       order: 3;
+       justify-content: center;
+   }
+}
+
+/* Enhanced input styles */
+.MuiTextField-root .MuiOutlinedInput-root {
+   border-radius: 12px !important;
+   transition: all 0.3s ease !important;
+}
+
+.MuiTextField-root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+   border-color: rgba(100, 181, 246, 0.5) !important;
+}
+
+.MuiTextField-root .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+   border-color: #64b5f6 !important;
+   border-width: 2px !important;
+}
+
+/* Enhanced card styles */
+.MuiPaper-root {
+   border-radius: 16px !important;
+   transition: all 0.3s ease !important;
+}
+
+.MuiPaper-root:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Loading animation */
+@keyframes fadeIn {
+   from {
+       opacity: 0;
+       transform: translateY(20px);
+   }
+   to {
+       opacity: 1;
+       transform: translateY(0);
+   }
+}
+
+.fade-in {
+   animation: fadeIn 0.6s ease-out;
+}
+
+/* Pulse animation for interactive elements */
+@keyframes pulse {
+   0% {
+       box-shadow: 0 0 0 0 rgba(100, 181, 246, 0.4);
+   }
+   70% {
+       box-shadow: 0 0 0 10px rgba(100, 181, 246, 0);
+   }
+   100% {
+       box-shadow: 0 0 0 0 rgba(100, 181, 246, 0);
+   }
+}
+
+.pulse {
+   animation: pulse 2s infinite;
+}
+
+/* Enhanced page transitions */
+.page-transition {
+   animation: fadeInPage 0.5s ease-out forwards;
+}
+
+@keyframes fadeInPage {
+   from {
+       opacity: 0;
+       transform: translateY(20px);
+   }
+   to {
+       opacity: 1;
+       transform: translateY(0);
+   }
+}
+
+/* Improved focus states */
+.MuiButton-root:focus,
+.MuiTextField-root .MuiOutlinedInput-root:focus,
+.MuiChip-root:focus {
+   outline: 2px solid #64b5f6 !important;
+   outline-offset: 2px !important;
+}
+
+/* Better spacing for main content */
+.main-content {
+   padding: 20px;
+   max-width: 1200px;
+   margin: 0 auto;
+}
+
+/* Enhanced loading states */
+.loading-shimmer {
+   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+   background-size: 200% 100%;
+   animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+   0% {
+       background-position: -200% 0;
+   }
+   100% {
+       background-position: 200% 0;
+   }
+}
+
+/* Improved mobile experience */
+@media (max-width: 480px) {
+   .main-content {
+       padding: 10px;
+   }
+
+   .content-block {
+       margin: 0 5px;
+   }
+}
