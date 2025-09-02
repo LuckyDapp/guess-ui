@@ -84,7 +84,7 @@ export function App() {
 
                     {/* Mode en ligne - chargé en arrière-plan sans bloquer l'interface */}
                     <Suspense fallback={null}>
-                        <ChainProvider chainId="pop">
+                        <ChainProvider chainId="pah">
                             <ErrorBoundary
                                 FallbackComponent={() => null} // Ne rien afficher en cas d'erreur
                                 onError={(error) => console.warn('Blockchain connection failed, staying in offline mode:', error)}

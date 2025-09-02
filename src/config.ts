@@ -18,8 +18,14 @@ export const config = defineConfig({
             rpc: PAH_RPC,
             contractAddress: PAH_CONTRACT_ADDRESS,
         },
+        pop: {
+            descriptor: pah, // Using pah descriptor for pop network
+            provider: getWsProvider(PAH_RPC), // Using same RPC for now
+            rpc: PAH_RPC,
+            contractAddress: PAH_CONTRACT_ADDRESS,
+        },
     },
-    targetChains:["pah"],
+    targetChains:["pah", "pop"],
     wallets: [
         new InjectedWalletProvider(),
     ],

@@ -190,8 +190,8 @@ export function DebugPage() {
     async getContractInfo() {
       return {
         contractAddress: '0xD6Ad3e67e2514bED804acc45945A7a102C4c6Ae4',
-        network: 'Pop Network (Polkadot Parachain)',
-        rpcUrl: 'wss://rpc1.paseo.popnetwork.xyz',
+        network: 'PASETO (Polkadot Parachain)',
+        rpcUrl: 'wss://testnet-passet-hub.polkadot.io',
         contractType: 'Guess the Number Game',
         functions: [
           'getCurrentGame()',
@@ -458,7 +458,7 @@ export function DebugPage() {
                   fullWidth
                   variant="outlined"
                   onClick={() => {
-                    const url = 'https://polkadot.js.org/apps/?rpc=wss://rpc1.paseo.popnetwork.xyz#/explorer';
+                    const url = 'https://polkadot.js.org/apps/?rpc=wss://testnet-passet-hub.polkadot.io#/explorer';
                     window.open(url, '_blank');
                   }}
                   sx={{
@@ -479,8 +479,8 @@ export function DebugPage() {
                   onClick={() => {
                     const contractInfo = {
                       address: '0xD6Ad3e67e2514bED804acc45945A7a102C4c6Ae4',
-                      network: 'Pop Network',
-                      rpc: 'wss://rpc1.paseo.popnetwork.xyz'
+                      network: 'PASETO Network',
+                      rpc: 'wss://testnet-passet-hub.polkadot.io'
                     };
                     copyToClipboard(JSON.stringify(contractInfo, null, 2));
                   }}

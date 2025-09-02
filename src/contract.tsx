@@ -122,7 +122,7 @@ function buildEventObserver(toastId: string,  successMessage: string, callback: 
             } else if (event.type === "finalized") {
                 message = "Finalized tx with hash: " + event.txHash;
             }
-            const network = "pop";
+            const network = "pah";
             const toastValue = (_: any) => (
                 <span className="toast-tx-result text-right">
                     {message}<br/><a target="_blank" href={"https://"+network+".subscan.io/extrinsic/"+event?.txHash}>show in Subscan</a>

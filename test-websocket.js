@@ -1,9 +1,9 @@
 const WebSocket = require('ws');
 
-console.log('🔍 Testing WebSocket connection to wss://rpc1.paseo.popnetwork.xyz/');
+console.log('🔍 Testing WebSocket connection to wss://testnet-passet-hub.polkadot.io/');
 console.log('⏳ Connecting...\n');
 
-const ws = new WebSocket('wss://rpc1.paseo.popnetwork.xyz/');
+const ws = new WebSocket('wss://testnet-passet-hub.polkadot.io/');
 
 ws.on('open', function open() {
     console.log('✅ WebSocket connection established!');

@@ -1,11 +1,12 @@
 #!/bin/bash
 
-echo "🔍 Testing Pop Network endpoints with Pop CLI..."
-echo "=================================================="
+echo "🔍 Testing PASETO Network endpoints..."
+echo "======================================"
 echo ""
 
 # Liste des endpoints à tester
 ENDPOINTS=(
+    "wss://testnet-passet-hub.polkadot.io/"
     "wss://rpc1.paseo.popnetwork.xyz/"
     "wss://rpc2.paseo.popnetwork.xyz/"
     "wss://archive.paseo.popnetwork.xyz/"
@@ -45,11 +46,11 @@ if [ ${#WORKING_ENDPOINTS[@]} -gt 0 ]; then
     echo ""
     echo "💡 Recommendation: Update your config.ts with one of these endpoints"
 else
-    echo "❌ No working Pop Network endpoints found"
+    echo "❌ No working network endpoints found"
     echo ""
     echo "💡 Suggestions:"
-    echo "   1. Check Pop Network documentation for current endpoints"
-    echo "   2. Contact Pop Network team for status updates"
-    echo "   3. Use a local Pop node for development"
+    echo "   1. Check PASETO Network documentation for current endpoints"
+    echo "   2. Contact PASETO team for status updates"
+    echo "   3. Use a local node for development"
     echo "   4. Consider using Westend for testing: wss://westend-rpc.polkadot.io/"
 fi

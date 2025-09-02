@@ -25,7 +25,7 @@ export function BlockchainStatus({ showDetails = false, compact = false }: Block
         setConnectionStatus(isConnected ? 'connected' : 'disconnected');
 
         if (isConnected) {
-          setNetworkName(chainId === 'pop' ? 'Pop Network' : 'Unknown Network');
+          setNetworkName(chainId === 'pah' ? 'PASETO Network' : chainId === 'pop' ? 'Pop Network' : 'Unknown Network');
           setBlockNumber(Math.floor(Math.random() * 1000000) + 1000000);
           setLatency(Math.floor(Math.random() * 200) + 50);
         }

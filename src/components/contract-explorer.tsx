@@ -418,7 +418,7 @@ export function ContractExplorer() {
   // Generate Polkadot.js links
   const generatePolkadotJsLinks = () => {
     const baseUrl = 'https://polkadot.js.org/apps/';
-    const rpcParam = '?rpc=wss%3A%2F%2Frpc1.paseo.popnetwork.xyz';
+    const rpcParam = '?rpc=wss%3A%2F%2Ftestnet-passet-hub.polkadot.io';
 
     return {
       // Lien vers l'explorateur général

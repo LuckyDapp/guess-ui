@@ -55,7 +55,7 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
     if (!signer) return { text: 'Not Connected', icon: <AccountCircle />, variant: 'warning' as const };
     if (!chainId) return { text: 'Connecting...', icon: <LinkOff />, variant: 'warning' as const };
 
-    const networkName = chainId === 'pop' ? 'Pop' : String(chainId).toUpperCase();
+    const networkName = chainId === 'pah' ? 'PASETO' : chainId === 'pop' ? 'Pop' : String(chainId).toUpperCase();
     return {
       text: `${networkName} ✓`,
       icon: <Link />,
@@ -115,7 +115,7 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
       <Typography variant="body2" sx={{ color: '#b0b0b0', mb: 2 }}>
         {chainId && signer ? (
           <>
-            Network: <span style={{ color: '#64b5f6' }}>{chainId === 'pop' ? 'Pop Network (Polkadot)' : String(chainId).toUpperCase()}</span><br/>
+            Network: <span style={{ color: '#64b5f6' }}>{chainId === 'pah' ? 'PASETO (Polkadot)' : chainId === 'pop' ? 'Pop Network (Polkadot)' : String(chainId).toUpperCase()}</span><br/>
             Account: <span style={{ color: '#64b5f6' }}>{encodeAddress(signer.publicKey).slice(0, 6)}...{encodeAddress(signer.publicKey).slice(-4)}</span>
           </>
         ) : (
@@ -168,6 +168,12 @@ export function NetworkInfo() {
   if (!chainId) return null;
 
   const networkInfo = {
+    pah: {
+      name: 'PASETO Network',
+      type: 'Polkadot Parachain',
+      rpc: 'wss://testnet-passet-hub.polkadot.io',
+      description: 'Decentralized gaming network powered by Phala Cloud'
+    },
     pop: {
       name: 'Pop Network',
       type: 'Polkadot Parachain',
