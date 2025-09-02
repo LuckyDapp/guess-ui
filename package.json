@@ -9,9 +9,9 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "gen-pop-rpc": "yarn papi add -w wss://rpc1.paseo.popnetwork.xyz pop",
+    "gen-pah-rpc": "yarn papi add -w wss://testnet-passet-hub.polkadot.io pah",
     "gen-ink-v6-contract-metadata": "yarn papi ink add metadata/guess_the_number.json",
-    "generate": "yarn gen-pop-rpc && yarn gen-ink-v6-contract-metadata",
+    "generate": "yarn gen-pah-rpc && yarn gen-ink-v6-contract-metadata",
     "postinstall": "yarn generate"
   },
   "peerDependencies": {
@@ -20,14 +20,14 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^5.11.11",
-    "@mui/material": "^7.2.0",
+    "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
     "@polkadot-api/descriptors": "file:.papi/descriptors",
-    "@polkadot-api/sdk-ink": "^0.1.0",
-    "@polkadot/keyring": "^13.5.4",
-    "@reactive-dot/react": "^0.44.0",
-    "dayjs": "^1.11.9",
-    "dot-connect": "^0.20.0",
+    "@polkadot-api/sdk-ink": "^0.4.0",
+    "@polkadot/keyring": "^13.5.6",
+    "@reactive-dot/react": "^0.46.2",
+    "dayjs": "^1.11.18",
+    "dot-connect": "^0.22.1",
     "polkadot-api": "*",
     "react": "latest",
     "react-dom": "latest",
@@ -36,8 +36,8 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@types/react": "^19.1.9",
-    "@types/react-dom": "^19.1.7",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "latest",
     "vite": "latest"
   }
