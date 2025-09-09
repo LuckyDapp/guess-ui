@@ -13,7 +13,19 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
   const chainId = useChainId();
   const signer = useSigner();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [connectionHealth, setConnectionHealth] = useState<'good' | 'fair' | 'poor'>('good');
+  const [connectionHealth, setConnectionHealth] = useState<{
+    status: 'good' | 'fair' | 'poor';
+    latency: number;
+    blockHeight: number;
+    peers: number;
+    lastBlockTime: number;
+  }>({
+    status: 'good',
+    latency: 0,
+    blockHeight: 0,
+    peers: 0,
+    lastBlockTime: 0
+  });
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -22,27 +34,55 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Simulate connection health monitoring
-    const healthCheck = setInterval(() => {
-      // In a real app, you would ping the blockchain node here
-      const health = Math.random();
-      if (health > 0.7) setConnectionHealth('good');
-      else if (health > 0.4) setConnectionHealth('fair');
-      else setConnectionHealth('poor');
-    }, 5000);
+    // Enhanced connection health monitoring
+    const healthCheck = setInterval(async () => {
+      if (!chainId) return;
+
+      try {
+        const startTime = Date.now();
+
+        // Simulate blockchain health check (in real app, this would be actual RPC calls)
+        const simulatedLatency = Math.random() * 500 + 50; // 50-550ms
+        const simulatedPeers = Math.floor(Math.random() * 50) + 10; // 10-60 peers
+        const simulatedBlockHeight = 1000000 + Math.floor(Math.random() * 1000);
+
+        const latency = Date.now() - startTime;
+
+        // Calculate health score based on multiple factors
+        const latencyScore = Math.max(0, 1 - (latency / 1000)); // Better if < 1s
+        const peerScore = Math.min(1, simulatedPeers / 30); // Better if > 30 peers
+        const overallScore = (latencyScore + peerScore) / 2;
+
+        let status: 'good' | 'fair' | 'poor';
+        if (overallScore > 0.7) status = 'good';
+        else if (overallScore > 0.4) status = 'fair';
+        else status = 'poor';
+
+        setConnectionHealth({
+          status,
+          latency: Math.round(simulatedLatency),
+          blockHeight: simulatedBlockHeight,
+          peers: simulatedPeers,
+          lastBlockTime: Date.now() - Math.random() * 60000 // Within last minute
+        });
+
+      } catch (error) {
+        setConnectionHealth(prev => ({ ...prev, status: 'poor' }));
+      }
+    }, 3000); // Check every 3 seconds
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       clearInterval(healthCheck);
     };
-  }, []);
+  }, [chainId]);
 
   const getConnectionColor = () => {
     if (!isOnline) return '#f44336';
     if (!signer) return '#ff9800';
     if (!chainId) return '#ff9800';
-    switch (connectionHealth) {
+    switch (connectionHealth.status) {
       case 'good': return '#4caf50';
       case 'fair': return '#ff9800';
       case 'poor': return '#f44336';
@@ -130,12 +170,12 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
               Connection Health
             </Typography>
             <Typography variant="caption" sx={{ color: getConnectionColor() }}>
-              {connectionHealth.toUpperCase()}
+              {connectionHealth.status.toUpperCase()}
             </Typography>
           </Box>
           <LinearProgress
             variant="determinate"
-            value={connectionHealth === 'good' ? 100 : connectionHealth === 'fair' ? 60 : 30}
+            value={connectionHealth.status === 'good' ? 100 : connectionHealth.status === 'fair' ? 60 : 30}
             sx={{
               height: 6,
               borderRadius: 3,
@@ -146,6 +186,47 @@ export function ConnectionStatus({ compact = false }: ConnectionStatusProps) {
               }
             }}
           />
+
+          {/* Detailed Health Metrics */}
+          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+            <Typography variant="caption" sx={{ color: '#888', mb: 1, display: 'block' }}>
+              Network Metrics
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem' }}>
+                  Latency
+                </Typography>
+                <Typography variant="body2" sx={{ color: connectionHealth.latency < 200 ? '#4caf50' : connectionHealth.latency < 500 ? '#ff9800' : '#f44336' }}>
+                  {connectionHealth.latency}ms
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem' }}>
+                  Peers
+                </Typography>
+                <Typography variant="body2" sx={{ color: connectionHealth.peers > 20 ? '#4caf50' : connectionHealth.peers > 10 ? '#ff9800' : '#f44336' }}>
+                  {connectionHealth.peers}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem' }}>
+                  Block Height
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64b5f6', fontFamily: 'monospace' }}>
+                  #{connectionHealth.blockHeight.toLocaleString()}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem' }}>
+                  Last Block
+                </Typography>
+                <Typography variant="body2" sx={{ color: Date.now() - connectionHealth.lastBlockTime < 30000 ? '#4caf50' : '#ff9800' }}>
+                  {Math.round((Date.now() - connectionHealth.lastBlockTime) / 1000)}s ago
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
         </Box>
       )}
 

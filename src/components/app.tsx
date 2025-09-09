@@ -11,9 +11,9 @@ import {GameContextProvider} from "../contexts/game-context.tsx";
 import {AccountSelect} from "./account-select.tsx";
 import {TransactionProvider} from "./transaction-provider.tsx";
 import {ConnectionStatus, NetworkInfo} from "./connection-status.tsx";
-import {OfflineMode} from "./offline-mode.tsx";
+import {BlockchainLoader} from "./blockchain-loader.tsx";
 import { Box, Button, ButtonGroup, AppBar, Toolbar, Typography, Alert } from "@mui/material";
-import { Games, BugReport, AccountBalance, SmartToy } from "@mui/icons-material";
+import { Games, BugReport, AccountBalance, SmartToy, Refresh } from "@mui/icons-material";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 export function App() {
@@ -79,63 +79,84 @@ export function App() {
                         </Alert>
                     </Box>
 
-                    {/* Mode hors ligne - affiché immédiatement */}
-                    <OfflineMode currentPage={currentPage} />
-
-                    {/* Mode en ligne - chargé en arrière-plan sans bloquer l'interface */}
-                    <Suspense fallback={null}>
-                        <ChainProvider chainId="pah">
+                    {/* Mode en ligne uniquement - Connexion directe au réseau PASETO */}
+                    <ChainProvider chainId="pah">
+                        <Suspense fallback={
+                            <Box sx={{
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                minHeight: '400px',
+                                flexDirection: 'column',
+                                gap: 2
+                            }}>
+                                <BlockchainLoader message="Connecting to PASETO Network..." size="large" />
+                                <Typography variant="h6" sx={{ color: '#64b5f6' }}>
+                                    Establishing blockchain connection...
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#b0b0b0', textAlign: 'center' }}>
+                                    Please wait while we connect to the PASETO network.<br/>
+                                    This may take a few moments.
+                                </Typography>
+                            </Box>
+                        }>
                             <ErrorBoundary
-                                FallbackComponent={() => null} // Ne rien afficher en cas d'erreur
-                                onError={(error) => console.warn('Blockchain connection failed, staying in offline mode:', error)}
+                                FallbackComponent={({ error, resetErrorBoundary }) => (
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        minHeight: '400px',
+                                        gap: 2,
+                                        p: 3
+                                    }}>
+                                        <Alert severity="error" sx={{ maxWidth: '600px' }}>
+                                            <Typography variant="h6">Connection Failed</Typography>
+                                            <Typography variant="body2">
+                                                Unable to connect to PASETO network. Please check your internet connection and try again.
+                                            </Typography>
+                                            <br/>
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                                Error: {error?.message || 'Unknown error'}
+                                            </Typography>
+                                        </Alert>
+                                        <Button
+                                            variant="contained"
+                                            onClick={resetErrorBoundary}
+                                            startIcon={<Refresh />}
+                                        >
+                                            Retry Connection
+                                        </Button>
+                                    </Box>
+                                )}
+                                onError={(error) => console.error('Blockchain connection error:', error)}
                             >
                                 <AccountSelect>
                                     {(selectedAccount) => (
                                         <SignerProvider signer={selectedAccount.polkadotSigner}>
                                             <TransactionProvider>
+                                                {/* Status de connexion */}
                                                 <Box sx={{ mb: 2 }}>
-                                                    <Alert severity="success">
-                                                        ✅ Account Connected: {selectedAccount.name || selectedAccount.address.slice(0, 10)}...
-                                                    </Alert>
+                                                    <ConnectionStatus />
+                                                    <NetworkInfo />
                                                 </Box>
 
+                                                {/* Contenu principal selon la page */}
                                                 {currentPage === 'game' && (
                                                     <GameContextProvider>
-                                                        <Box sx={{ mb: 2 }}>
-                                                            <Alert severity="info">
-                                                                🎮 Game Mode (Online)
-                                                            </Alert>
-                                                        </Box>
                                                         <Game/>
                                                     </GameContextProvider>
                                                 )}
-                                                {currentPage === 'explorer' && (
-                                                    <>
-                                                        <Box sx={{ mb: 2 }}>
-                                                            <Alert severity="info">
-                                                                🔍 Explorer Mode (Online)
-                                                            </Alert>
-                                                        </Box>
-                                                        <ContractExplorer />
-                                                    </>
-                                                )}
-                                                {currentPage === 'debug' && (
-                                                    <>
-                                                        <Box sx={{ mb: 2 }}>
-                                                            <Alert severity="info">
-                                                                🐛 Debug Mode (Online)
-                                                            </Alert>
-                                                        </Box>
-                                                        <DebugPage />
-                                                    </>
-                                                )}
+                                                {currentPage === 'explorer' && <ContractExplorer />}
+                                                {currentPage === 'debug' && <DebugPage />}
                                             </TransactionProvider>
                                         </SignerProvider>
                                     )}
                                 </AccountSelect>
                             </ErrorBoundary>
-                        </ChainProvider>
-                    </Suspense>
+                        </Suspense>
+                    </ChainProvider>
                 </Box>
             </Box>
 
