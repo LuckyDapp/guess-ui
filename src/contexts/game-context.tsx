@@ -1,16 +1,13 @@
-import {createContext, useEffect, useState, useCallback, useRef} from 'react';
-import type {Attempt, Game} from "../types.ts";
-import {getOrCreateContract} from "../contract.tsx";
-import {encodeAddress} from "@polkadot/keyring";
-import {useChainId, useSigner} from "@reactive-dot/react";
+import { createContext, useEffect, useState, ReactNode } from 'react';
+import type { Attempt, Game, GameContextType } from "../types.ts";
+import { getOrCreateContract } from "../contract.tsx";
+import { encodeAddress } from "@polkadot/keyring";
+import { useChainId, useSigner } from "@reactive-dot/react";
 
-export const GameContext = createContext<GameContextStruct | undefined>(undefined);
-export type GameContextStruct = {
-    game : Game | undefined,
-    getAttempts : () => Attempt[],
-    refreshGuesses : () => void,
-    refreshGame : () => void,
-    refreshGameState : () => Promise<void>,
+export const GameContext = createContext<GameContextType | undefined>(undefined);
+
+interface GameContextProviderProps {
+  children: ReactNode;
 }
 
 function updateAttempts(attempts: Attempt[], game: Game){
@@ -41,7 +38,7 @@ function updateAttempts(attempts: Attempt[], game: Game){
     return attempts
 }
 
-export const GameContextProvider = ({ children }: { children: React.ReactNode }) => {
+export const GameContextProvider = ({ children }: GameContextProviderProps) => {
 
     const chainId = useChainId();
     const signer = useSigner();
@@ -49,146 +46,79 @@ export const GameContextProvider = ({ children }: { children: React.ReactNode })
     const [attempts, setAttempts] = useState<Attempt[]>([]);
     const [nbNewGames, setNbNewGames] = useState(0);
     const [nbNewGuesses, setNbNewGuesses] = useState(0);
-    const [isPollingAggressively, setIsPollingAggressively] = useState(false);
-    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const aggressivePollingRef = useRef<NodeJS.Timeout | null>(null);
 
-    const refreshGameState = useCallback(async () => {
-        if (!signer || !chainId) return;
+    useEffect(() => {
+        if (signer && chainId) {
+            console.log("address: " + encodeAddress(signer.publicKey));
+            console.log("refresh game");
+            getOrCreateContract(chainId)
+                .getCurrentGame(signer)
+                .then(
+                    (game) => {
+                        setGame(game);
+                        setAttempts(updateAttempts([], game));
+                    }
+                ).catch((e) => {
+                    console.warn("Error loading game:", e);
+                    setGame(undefined);
+                    setAttempts([]);
+                });
+        } else {
+            console.warn("no selected address");
+        }
+    }, [signer, chainId, nbNewGames]);
 
-        try {
-            const currentGame = await getOrCreateContract(chainId).getCurrentGame(signer);
-            setGame(currentGame);
-            setAttempts(prevAttempts => updateAttempts([...prevAttempts], currentGame));
-            return currentGame;
-        } catch (error) {
-            console.error("Error refreshing game state:", error);
-            setGame(undefined);
-            setAttempts([]);
-            return null;
+    useEffect(() => {
+        if (signer && chainId) {
+            console.log("refresh attempts");
+            getOrCreateContract(chainId)
+                .getCurrentGame(signer)
+                .then(
+                    (game) => {
+                        setGame(game);
+                        setAttempts(updateAttempts(attempts, game));
+                    }
+                ).catch((e) => {
+                    console.warn("Error refreshing attempts:", e);
+                    setAttempts([]);
+                });
+        }
+    }, [nbNewGuesses]);
+
+    const refreshInBackground = async () => {
+        if (signer && chainId) {
+            console.log("periodically refresh attempts");
+            getOrCreateContract(chainId)
+                .getCurrentGame(signer)
+                .then(
+                    (game) => {
+                        setGame(game);
+                        setAttempts(updateAttempts(attempts, game));
+                    }
+                ).catch((e) => {
+                    console.warn("Error in background refresh:", e);
+                    setAttempts([]);
+                });
+        }
+    };
+
+    useEffect(() => {
+        const backgroundSyncInterval = setInterval(() => {
+            refreshInBackground();
+        }, 10 * 1000); // every 10 seconds
+
+        return () => {
+            clearInterval(backgroundSyncInterval);
         }
     }, [signer, chainId]);
 
-    // Function to start aggressive polling when needed
-    const startAggressivePolling = useCallback(() => {
-        if (isPollingAggressively) return;
+    const refreshGuesses = () => {
+        setNbNewGuesses(nbNewGuesses + 1);
+    }
 
-        console.log("Starting aggressive polling for pending guesses");
-        setIsPollingAggressively(true);
-
-        let pollCount = 0;
-        const maxPolls = 30;
-
-        const pollWithBackoff = () => {
-            if (pollCount >= maxPolls) {
-                console.log("Stopping aggressive polling - max polls reached");
-                if (aggressivePollingRef.current) {
-                    clearTimeout(aggressivePollingRef.current);
-                    aggressivePollingRef.current = null;
-                }
-                setIsPollingAggressively(false);
-                return;
-            }
-
-            refreshGameState().then((currentGame) => {
-                pollCount++;
-
-                // Simple logic: continue polling until we hit max polls
-                // The UI will update naturally when the smart contract state changes
-                if (pollCount < maxPolls) {
-                    const delay = pollCount <= 4 ? Math.pow(2, pollCount - 1) * 1000 : 10000;
-                    aggressivePollingRef.current = setTimeout(pollWithBackoff, delay);
-                } else {
-                    if (aggressivePollingRef.current) {
-                        clearTimeout(aggressivePollingRef.current);
-                        aggressivePollingRef.current = null;
-                    }
-                    setIsPollingAggressively(false);
-                    console.log("Stopped aggressive polling - max polls reached");
-                }
-            }).catch(() => {
-                // If refresh fails, still continue polling but with longer delay
-                pollCount++;
-                if (pollCount < maxPolls) {
-                    const delay = pollCount <= 4 ? Math.pow(2, pollCount - 1) * 1000 : 10000;
-                    aggressivePollingRef.current = setTimeout(pollWithBackoff, delay);
-                } else {
-                    if (aggressivePollingRef.current) {
-                        clearTimeout(aggressivePollingRef.current);
-                        aggressivePollingRef.current = null;
-                    }
-                    setIsPollingAggressively(false);
-                }
-            });
-        };
-
-        pollWithBackoff();
-    }, [isPollingAggressively, refreshGameState]);
-
-
-    // Initial game load and refresh when game changes
-    useEffect(() => {
-        if (signer && chainId) {
-            console.log("Loading initial game state");
-            refreshGameState();
-        } else {
-            console.warn("No signer or chainId available");
-            setGame(undefined);
-            setAttempts([]);
-        }
-    }, [signer, chainId, nbNewGames, refreshGameState]);
-
-    // Refresh attempts when nbNewGuesses changes
-    useEffect(() => {
-        if (signer && chainId && nbNewGuesses > 0) {
-            console.log("Refreshing attempts after new guess");
-            refreshGameState().then(() => {
-                // Start aggressive polling after a new guess
-                setTimeout(() => startAggressivePolling(), 500);
-            });
-        }
-    }, [nbNewGuesses, refreshGameState, signer, chainId, startAggressivePolling]);
-
-    // Regular background polling (every 30 seconds when not aggressively polling)
-    useEffect(() => {
-        if (!isPollingAggressively) {
-            pollingIntervalRef.current = setInterval(() => {
-                refreshGameState();
-            }, 30 * 1000);
-        }
-
-        return () => {
-            if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-            }
-        };
-    }, [isPollingAggressively, refreshGameState]);
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-            }
-            if (aggressivePollingRef.current) {
-                clearTimeout(aggressivePollingRef.current);
-            }
-        };
-    }, []);
-
-    const refreshGuesses = useCallback(() => {
-        console.log("New guess submitted - triggering immediate refresh");
-        setNbNewGuesses(prev => prev + 1);
-        // Immediately refresh and start aggressive polling
-        refreshGameState().then(() => {
-            setTimeout(() => startAggressivePolling(), 100);
-        });
-    }, [refreshGameState, startAggressivePolling]);
-
-    const refreshGame = useCallback(() => {
-        setNbNewGames(prev => prev + 1);
-        refreshGameState();
-    }, [refreshGameState]);
+    const refreshGame = () => {
+        setNbNewGames(nbNewGames + 1);
+    }
 
     const getAttempts =  () => {
         if (game == undefined || attempts==undefined){
@@ -198,7 +128,7 @@ export const GameContextProvider = ({ children }: { children: React.ReactNode })
     };
 
     return (
-        <GameContext.Provider value={{ game, getAttempts, refreshGuesses, refreshGame, refreshGameState }} >
+        <GameContext.Provider value={{ game, getAttempts, refreshGuesses, refreshGame }} >
             {children}
         </GameContext.Provider>
     );

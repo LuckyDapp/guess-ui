@@ -1,584 +1,566 @@
-import {Suspense, useContext, useRef, useState} from "react";
-import {Box, Button, TextField, Typography} from "@mui/material";
-import {GameContext} from "../contexts/game-context.tsx";
-import {GameIntro} from "./game-intro.tsx";
-import {BlockchainLoader} from "./blockchain-loader.tsx";
-import {getContractAddress, gtnContract} from "../config.ts";
-import {toast} from "react-hot-toast";
-import {useContractMutation, useMutationEffect, useQueryErrorResetter, useChainId} from "@reactive-dot/react";
-import {MutationError, pending} from "@reactive-dot/core";
-import {ErrorBoundary, type FallbackProps} from "react-error-boundary";
-import {isPositiveNumber} from "../utils/number-utils.ts";
-import {useTransactionContext} from "./transaction-provider.tsx";
-import {GameLoadingState, AttemptsLoadingState} from "./skeleton-loader.tsx";
-import {InteractiveButton, useInteractionFeedback} from "./interaction-feedback.tsx";
+import { Suspense, useContext, useRef, useState, useEffect } from "react";
+import { Box, Button, TextField, Typography } from "@mui/material";
+import { GameContext } from "../contexts/game-context.tsx";
+import { getContractAddress, gtnContract } from "../config.ts";
+import { toast } from "react-hot-toast";
+import { useContractMutation, useMutationEffect, useQueryErrorResetter, useChainId } from "@reactive-dot/react";
+import { MutationError, pending } from "@reactive-dot/core";
+import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
+import type { MutationEvent } from "@reactive-dot/react/src/contexts/mutation.tsx";
+import { isPositiveNumber } from "../utils/number-utils.ts";
+import type { Attempt, ClueType } from "../types.ts";
+import { ERROR_MESSAGES, TOAST_MESSAGES, UI_CONFIG } from "../constants";
+import { MiniGames } from "./mini-games.tsx";
 
+// Loading animation component
+function GameCreationLoader({ step }: { step: 'submitting' | 'finalizing' | 'syncing' }) {
+  return (
+    <Box sx={{ 
+      textAlign: 'left', 
+      p: 3,
+      background: 'linear-gradient(135deg, rgba(100, 181, 246, 0.1) 0%, rgba(33, 150, 243, 0.05) 100%)',
+      borderRadius: 'var(--radius-lg)',
+      border: '2px solid rgba(100, 181, 246, 0.3)'
+    }}>
+      <Typography variant="h5" sx={{ 
+        color: 'var(--color-primary)', 
+        mb: 2,
+        fontFamily: 'var(--font-heading)',
+        textShadow: '0 0 10px rgba(100, 181, 246, 0.5)'
+      }}>
+        🎲 Creating Your Game
+      </Typography>
 
-export function CurrentGame() {
-
-    const context = useContext(GameContext);
-    if (!context) {
-        return <div>Loading...</div>;
-    }
-    const { game, getAttempts } = context;
-
-    if (game == undefined){
-        return (
-            <Box sx={{
-                padding: { xs: "30px 20px 0", sm: "50px 40px 0" },
-                display: 'flex',
-                justifyContent: 'center'
-            }}>
-                <div className="content-block fade-in" style={{
-                    padding: '40px',
-                    textAlign: 'center',
-                    borderRadius: '20px'
-                }}>
-                    <Typography variant="h6" sx={{ color: '#b0b0b0', mb: 2 }}>
-                        No Active Game
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#888' }}>
-                        Start a new game to begin playing!
-                    </Typography>
-                </div>
-            </Box>
-        );
-    }
-
-    const attempts = getAttempts();
-
-    return (
-        <Box sx={{
-            padding: { xs: "30px 20px 0", sm: "50px 40px 0" },
-            display: 'flex',
-            justifyContent: 'center'
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minHeight: '96px' }}>
+        <Typography variant="body1" sx={{ 
+          color: step === 'submitting' ? 'var(--color-primary)' : 'var(--text-secondary)',
+          fontWeight: step === 'submitting' ? 700 : 500
         }}>
-            <div className="content-block fade-in" style={{
-                width: '100%',
-                maxWidth: '700px',
-                padding: '30px',
-                borderRadius: '20px'
-            }}>
-                {/* Game Header */}
-                <Box sx={{ textAlign: 'center', mb: 4 }}>
-                    <Typography
-                        variant="h5"
-                        sx={{
-                            color: '#64b5f6',
-                            fontWeight: 600,
-                            mb: 1
-                        }}
-                    >
-                        🎯 Guess the Number
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: '#b0b0b0' }}>
-                        Find the secret number between <span style={{ color: '#64b5f6', fontWeight: 600 }}>{game?.min_number}</span> and <span style={{ color: '#64b5f6', fontWeight: 600 }}>{game?.max_number}</span>
-                    </Typography>
-                </Box>
+          {step === 'submitting' ? '• Submitting transaction to create a new game' : '○ Submitting transaction to create a new game'}
+        </Typography>
+        <Typography variant="body1" sx={{ 
+          color: step === 'finalizing' ? 'var(--color-primary)' : 'var(--text-secondary)',
+          fontWeight: step === 'finalizing' ? 700 : 500
+        }}>
+          {step === 'finalizing' ? '• Waiting for blockchain finalization' : '○ Waiting for blockchain finalization'}
+        </Typography>
+        <Typography variant="body1" sx={{ 
+          color: step === 'syncing' ? 'var(--color-primary)' : 'var(--text-secondary)',
+          fontWeight: step === 'syncing' ? 700 : 500
+        }}>
+          {step === 'syncing' ? '• Syncing latest game state' : '○ Syncing latest game state'}
+        </Typography>
+      </Box>
 
-                {/* Attempts History */}
-                {attempts.length > 0 && (
-                    <Box sx={{ mb: 4 }}>
-                        <Typography
-                            variant="h6"
-                            sx={{
-                                color: 'white',
-                                mb: 2,
-                                fontWeight: 600
-                            }}
-                        >
-                            Your Attempts ({attempts.length})
-                        </Typography>
-                        <Box sx={{
-                            maxHeight: '300px',
-                            overflowY: 'auto',
-                            '&::-webkit-scrollbar': {
-                                width: '6px'
-                            },
-                            '&::-webkit-scrollbar-thumb': {
-                                backgroundColor: 'rgba(100, 181, 246, 0.3)',
-                                borderRadius: '3px'
-                            }
-                        }}>
-                            {attempts.map(attempt => (
-                                <Box
-                                    key={attempt.attemptNumber}
-                                    sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        p: 2,
-                                        mb: 1,
-                                        borderRadius: '12px',
-                                        background: attempt.clue == undefined
-                                            ? 'rgba(255, 152, 0, 0.1)'
-                                            : (attempt.clue as any)?.type == "Found"
-                                                ? 'rgba(76, 175, 80, 0.1)'
-                                                : 'rgba(32, 33, 37, 0.5)',
-                                        border: attempt.clue == undefined
-                                            ? '1px solid rgba(255, 152, 0, 0.3)'
-                                            : (attempt.clue as any)?.type == "Found"
-                                                ? '1px solid rgba(76, 175, 80, 0.3)'
-                                                : '1px solid rgba(255, 255, 255, 0.1)'
-                                    }}
-                                >
-                                    {(() => {
-                                        if (attempt.clue == undefined){
-                                            return (
-                                                <>
-                                                    <Typography variant="body2" sx={{ mr: 2, color: '#ff9800' }}>
-                                                        Attempt #{attempt.attemptNumber}
-                                                    </Typography>
-                                                    <BlockchainLoader
-                                                        message="Waiting for Phala Cloud..."
-                                                        size="small"
-                                                    />
-                                                    <Typography variant="body2" sx={{ ml: 2, color: '#b0b0b0' }}>
-                                                        Guessed: {attempt.guess}
-                                                    </Typography>
-                                                </>
-                                            );
-                                        }
-                                        if ((attempt.clue as any).type == "Less"){
-                                            return (
-                                                <>
-                                                    <Typography variant="body2" sx={{ color: '#f44336', mr: 2 }}>
-                                                        #{attempt.attemptNumber}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ color: '#b0b0b0' }}>
-                                                        My number is <span style={{ color: '#f44336', fontWeight: 600 }}>less than</span> {attempt.guess}
-                                                    </Typography>
-                                                </>
-                                            );
-                                        }
-                                        if ((attempt.clue as any).type == "More"){
-                                            return (
-                                                <>
-                                                    <Typography variant="body2" sx={{ color: '#4caf50', mr: 2 }}>
-                                                        #{attempt.attemptNumber}
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ color: '#b0b0b0' }}>
-                                                        My number is <span style={{ color: '#4caf50', fontWeight: 600 }}>more than</span> {attempt.guess}
-                                                    </Typography>
-                                                </>
-                                            );
-                                        }
-                                        if ((attempt.clue as any).type == "Found"){
-                                            return (
-                                                <>
-                                                    <Typography variant="body2" sx={{ color: '#4caf50', mr: 2 }}>
-                                                        #{attempt.attemptNumber} 🎉
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ color: '#4caf50', fontWeight: 600 }}>
-                                                        Congratulations! You found the number {attempt.guess}!
-                                                    </Typography>
-                                                </>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </Box>
-                            ))}
-                        </Box>
-                    </Box>
-                )}
+      <Typography variant="body2" sx={{ 
+        color: 'var(--text-secondary)',
+        fontStyle: 'italic',
+        mt: 2
+      }}>
+        This may take a few moments...
+      </Typography>
+    </Box>
+  );
+}
 
-                {/* Make Guess Component */}
-                <MakeGuess />
-            </div>
-        </Box>
-    );
+// Inline status for guess submission
+function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' }) {
+  return (
+    <Box sx={{ 
+      textAlign: 'left', 
+      p: 2,
+      background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(184, 134, 11, 0.05) 100%)',
+      borderRadius: 'var(--radius-lg)',
+      border: '1px solid rgba(212, 175, 55, 0.25)'
+    }}>
+      <Typography variant="subtitle1" sx={{ 
+        color: 'var(--color-primary)', 
+        mb: 1,
+        fontFamily: 'var(--font-heading)'
+      }}>
+        🎯 Processing your guess
+      </Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minHeight: '72px' }}>
+        <Typography variant="body2" sx={{ color: step === 'submitting' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'submitting' ? 700 : 500 }}>
+          {step === 'submitting' ? '• Submitting transaction' : '○ Submitting transaction'}
+        </Typography>
+        <Typography variant="body2" sx={{ color: step === 'finalizing' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'finalizing' ? 700 : 500 }}>
+          {step === 'finalizing' ? '• Waiting for finalization' : '○ Waiting for finalization'}
+        </Typography>
+        <Typography variant="body2" sx={{ color: step === 'syncing' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'syncing' ? 700 : 500 }}>
+          {step === 'syncing' ? '• Syncing attempts' : '○ Syncing attempts'}
+        </Typography>
+      </Box>
+    </Box>
+  );
 }
 
 
 export function MakeGuess() {
+  const chainId = useChainId();
+  const contractAddress = getContractAddress(chainId);
+  const { refreshGuesses, getAttempts } = useContext(GameContext);
+  const inputNumber = useRef<HTMLInputElement>(null);
+  const [hasPendingAttempt, setHasPendingAttempt] = useState(false);
+  const [guessStep, setGuessStep] = useState<'submitting' | 'finalizing' | 'syncing' | 'idle'>('idle');
 
-    const chainId = useChainId();
-    const contractAddress = getContractAddress(chainId);
-    const context = useContext(GameContext);
-    if (!context) {
-        return <div>Loading...</div>;
-    }
-    const { refreshGuesses } = context;
-    const transactionContext = useTransactionContext();
-    const { showFeedback, FeedbackComponent } = useInteractionFeedback();
-    const [isSubmitting, setIsSubmitting] = useState(false);
+  const [_, makeGuess] = useContractMutation((mutate) =>
+    mutate(gtnContract, contractAddress, "guess", {
+      data: { "guess": inputNumber.current?.value },
+    }),
+  );
 
-    const inputNumber = useRef<HTMLInputElement>(null);
-
-    const [_, makeGuess] = useContractMutation((mutate) =>
-        mutate(gtnContract, contractAddress, "guess", {
-            data: {"guess": parseInt(inputNumber.current?.value || "0")},
-        }),
-    );
-
-    const submit = async () => {
-        const guessNumber = inputNumber.current?.value;
-
-        console.log("Guess " + guessNumber);
-        if (!isPositiveNumber(guessNumber)){
-            showFeedback('error', 'Please enter a valid positive number');
-            return;
+  // Check for pending attempts
+  useEffect(() => {
+    const checkPendingAttempts = () => {
+      try {
+        const attempts = getAttempts();
+        const hasPending = Array.isArray(attempts) && attempts.some(attempt => !attempt.clue);
+        setHasPendingAttempt(hasPending);
+        if (!hasPending && guessStep === 'syncing') {
+          setGuessStep('idle');
         }
-
-        setIsSubmitting(true);
-        try {
-            await makeGuess();
-            showFeedback('success', 'Guess submitted successfully!');
-        } catch (error) {
-            showFeedback('error', 'Failed to submit guess. Please try again.');
-        } finally {
-            setIsSubmitting(false);
-        }
+      } catch (error) {
+        console.warn('Error checking pending attempts:', error);
+        setHasPendingAttempt(false);
+      }
     };
 
-    useMutationEffect(onMutationEvent(refreshGuesses, transactionContext));
+    checkPendingAttempts();
+    const interval = setInterval(checkPendingAttempts, 1000);
+    return () => clearInterval(interval);
+  }, [getAttempts, guessStep]);
 
-    return (
-        <>
-            {FeedbackComponent}
-            <Box sx={{
-                padding: { xs: "30px 0 0", sm: "40px 0 0" },
-                display: 'flex',
-                justifyContent: 'center'
-            }}>
-                <Box
-                    className="content-block fade-in"
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        alignItems: 'center',
-                        gap: 2,
-                        p: 3,
-                        width: '100%',
-                        maxWidth: '500px',
-                        borderRadius: '16px'
-                    }}
-                >
-                    <TextField
-                        inputRef={inputNumber}
-                        id="guess-number-value"
-                        label="Enter your guess"
-                        variant="outlined"
-                        type="number"
-                        disabled={isSubmitting}
-                        sx={{
-                            flex: 1,
-                            '& .MuiOutlinedInput-root': {
-                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                },
-                                '&.Mui-focused': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                }
-                            }
-                        }}
-                        InputLabelProps={{
-                            sx: { color: '#b0b0b0' }
-                        }}
-                        inputProps={{
-                            sx: { color: 'white' }
-                        }}
-                    />
-                    <InteractiveButton
-                        onClick={submit}
-                        variant="primary"
-                        disabled={isSubmitting}
-                        loading={isSubmitting}
-                        sx={{
-                            minWidth: { xs: '100%', sm: '140px' },
-                            height: '56px'
-                        }}
-                    >
-                        🚀 Make Guess
-                    </InteractiveButton>
-                </Box>
-            </Box>
-        </>
-    );
+  const handleSubmit = async () => {
+    const guessNumber = inputNumber.current?.value;
+
+    if (!guessNumber) {
+      toast.error(ERROR_MESSAGES.VALIDATION_ERROR);
+      return;
+    }
+
+    if (!isPositiveNumber(guessNumber)) {
+      toast.error(ERROR_MESSAGES.INVALID_NUMBER);
+      return;
+    }
+
+    console.log("Guess:", guessNumber);
+    setGuessStep('submitting');
+    makeGuess();
+  };
+
+  // Local mutation listener to drive in-block status + refresh
+  useMutationEffect((event: MutationEvent) => {
+    if (event.value === pending) {
+      setGuessStep('submitting');
+      toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
+      return;
+    }
+
+    if (event.value instanceof MutationError) {
+      toast.error(TOAST_MESSAGES.TRANSACTION_ERROR, { id: event.id });
+      setGuessStep('idle');
+      return;
+    }
+
+    switch (event.value.type) {
+      case 'finalized':
+        if (event.value.ok) {
+          toast.success(`${TOAST_MESSAGES.TRANSACTION_SUCCESS}: ${event.value.txHash}`, { id: event.id });
+          setGuessStep('syncing');
+          refreshGuesses();
+        } else {
+          toast.error(`${TOAST_MESSAGES.TRANSACTION_ERROR}: ${event.value?.dispatchError?.value?.value?.type}`, { id: event.id });
+          setGuessStep('idle');
+        }
+        break;
+      default:
+        setGuessStep('finalizing');
+        toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
+    }
+  });
+
+  return (
+    <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+      <div className="content-block fade-in" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 'var(--spacing-lg)',
+        padding: 'var(--spacing-xl)',
+        width: '100%',
+        maxWidth: `${UI_CONFIG.GUESS_MAX_WIDTH}px`,
+        borderRadius: 'var(--radius-2xl)'
+      }}>
+        <h4>Make Your Guess</h4>
+
+        {(guessStep !== 'idle' || hasPendingAttempt) && (
+          <div style={{ width: '100%' }}>
+            <GuessStatus step={guessStep === 'idle' ? 'syncing' : guessStep} />
+          </div>
+        )}
+        
+        {(!hasPendingAttempt && guessStep === 'idle') ? (
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%' }}>
+            <TextField 
+              inputRef={inputNumber} 
+              id="guess-number-value" 
+              label="Enter your number" 
+              variant="outlined"
+              fullWidth
+            />
+            <Button 
+              onClick={handleSubmit} 
+              variant="contained"
+              sx={{ minWidth: '140px' }}
+            >
+              Make a guess
+            </Button>
+          </Box>
+        ) : (
+          <Box sx={{ width: '100%', textAlign: 'center' }}>
+            <MiniGames onComplete={() => {}} />
+          </Box>
+        )}
+      </div>
+    </Box>
+  );
 }
 
 
-function NewGame() {
+export function NewGame({ compact = false, onGameCreated }: { compact?: boolean; onGameCreated?: () => void }) {
+  const chainId = useChainId();
+  const contractAddress = getContractAddress(chainId);
+  const { refreshGame } = useContext(GameContext);
+  const refMin = useRef<HTMLInputElement>(null);
+  const refMax = useRef<HTMLInputElement>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
-    const chainId = useChainId();
-    const contractAddress = getContractAddress(chainId);
-    const context = useContext(GameContext);
-    if (!context) {
-        return <div>Loading...</div>;
+  const [__, newGame] = useContractMutation((mutate) =>
+    mutate(gtnContract, contractAddress, "start_new_game", {
+      data: { 
+        "min_number": refMin.current?.value, 
+        "max_number": refMax.current?.value 
+      },
+    }),
+  );
+
+  useMutationEffect(onMutationEvent(() => {
+    refreshGame();
+    setIsCreating(false);
+    if (onGameCreated) {
+      onGameCreated();
     }
-    const { refreshGame } = context;
-    const transactionContext = useTransactionContext();
-    const { showFeedback, FeedbackComponent } = useInteractionFeedback();
-    const [isSubmitting, setIsSubmitting] = useState(false);
+  }));
 
-    const refMin = useRef<HTMLInputElement>(null);
-    const refMax = useRef<HTMLInputElement>(null);
+  const handleSubmit = async () => {
+    const minNumber = refMin.current?.value;
+    const maxNumber = refMax.current?.value;
 
-    const [__, newGame] = useContractMutation((mutate) =>
-        mutate(gtnContract, contractAddress, "start_new_game", {
-            data: {"min_number": parseInt(refMin.current?.value || "0"), "max_number": parseInt(refMax.current?.value || "0")},
-        }),
-    );
+    if (!minNumber || !maxNumber) {
+      toast.error(ERROR_MESSAGES.MIN_MAX_REQUIRED);
+      return;
+    }
 
-    useMutationEffect(onMutationEvent(refreshGame, transactionContext));
+    if (!isPositiveNumber(minNumber) || !isPositiveNumber(maxNumber)) {
+      toast.error(ERROR_MESSAGES.INVALID_NUMBER);
+      return;
+    }
 
-    const submit = async () => {
-        const minNumber = refMin.current?.value;
-        const maxNumber = refMax.current?.value;
+    if (parseInt(minNumber) >= parseInt(maxNumber)) {
+      toast.error(ERROR_MESSAGES.MIN_LESS_THAN_MAX);
+      return;
+    }
 
-        if (!minNumber || !maxNumber) {
-            showFeedback('warning', 'Please enter both min and max values');
-            return;
-        }
+    console.log("Start new game:", minNumber, "-", maxNumber);
+    setIsCreating(true);
+    newGame();
+  };
 
-        console.log("Start new game " + minNumber + " - " + maxNumber);
-        if (!isPositiveNumber(minNumber) || ! isPositiveNumber(maxNumber)){
-            showFeedback('error', 'Min and Max must be positive numbers');
-            return;
-        }
-        if (parseInt(minNumber) >= parseInt(maxNumber)){
-            showFeedback('error', 'Min must be less than Max');
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            await newGame();
-            showFeedback('success', 'New game started successfully!');
-        } catch (error) {
-            showFeedback('error', 'Failed to start new game. Please try again.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+  if (compact) {
+    if (isCreating) {
+      return (
+        <div style={{ width: '100%', maxWidth: '480px' }}>
+          <GameCreationLoader step={'submitting'} />
+        </div>
+      );
+    }
 
     return (
-        <>
-            {FeedbackComponent}
-            <Box sx={{
-                padding: { xs: "60px 20px 0", sm: "100px 40px 0" },
-                display: 'flex',
-                justifyContent: 'center'
-            }}>
-                <Box
-                    className="content-block fade-in"
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        alignItems: 'center',
-                        gap: 2,
-                        p: 3,
-                        width: '100%',
-                        maxWidth: '600px',
-                        borderRadius: '16px'
-                    }}
-                >
-                    <Typography
-                        variant="h6"
-                        sx={{
-                            color: '#64b5f6',
-                            fontWeight: 600,
-                            mr: { xs: 0, sm: 2 },
-                            mb: { xs: 2, sm: 0 },
-                            textAlign: { xs: 'center', sm: 'left' }
-                        }}
-                    >
-                        🎮 Start New Game
-                    </Typography>
-                    <Box sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        gap: 2,
-                        flex: 1
-                    }}>
-                        <TextField
-                            inputRef={refMin}
-                            id="new-game-min-value"
-                            label="Min Number"
-                            variant="outlined"
-                            type="number"
-                            disabled={isSubmitting}
-                            sx={{
-                                flex: 1,
-                                '& .MuiOutlinedInput-root': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    transition: 'all 0.3s ease',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    },
-                                    '&.Mui-focused': {
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                    }
-                                }
-                            }}
-                            InputLabelProps={{
-                                sx: { color: '#b0b0b0' }
-                            }}
-                            inputProps={{
-                                sx: { color: 'white' }
-                            }}
-                        />
-                        <TextField
-                            inputRef={refMax}
-                            id="new-game-max-value"
-                            label="Max Number"
-                            variant="outlined"
-                            type="number"
-                            disabled={isSubmitting}
-                            sx={{
-                                flex: 1,
-                                '& .MuiOutlinedInput-root': {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    transition: 'all 0.3s ease',
-                                    '&:hover': {
-                                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    },
-                                    '&.Mui-focused': {
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                    }
-                                }
-                            }}
-                            InputLabelProps={{
-                                sx: { color: '#b0b0b0' }
-                            }}
-                            inputProps={{
-                                sx: { color: 'white' }
-                            }}
-                        />
-                    </Box>
-                    <InteractiveButton
-                        onClick={submit}
-                        variant="success"
-                        disabled={isSubmitting}
-                        loading={isSubmitting}
-                        sx={{
-                            minWidth: { xs: '100%', sm: '160px' },
-                            height: '56px'
-                        }}
-                    >
-                        🎯 Start Game
-                    </InteractiveButton>
-                </Box>
-            </Box>
-        </>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 'var(--spacing-lg)',
+        padding: 'var(--spacing-lg)',
+        background: 'rgba(0, 0, 0, 0.2)',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)', alignItems: 'center', width: '100%', maxWidth: '400px' }}>
+          <TextField 
+            inputRef={refMin} 
+            id="new-game-min-value" 
+            label="Min" 
+            variant="outlined"
+            type="number"
+            size="small"
+            sx={{ flex: 1 }}
+          />
+          <TextField 
+            inputRef={refMax} 
+            id="new-game-max-value" 
+            label="Max" 
+            variant="outlined"
+            type="number"
+            size="small"
+            sx={{ flex: 1 }}
+          />
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained"
+            size="small"
+            sx={{ minWidth: '120px' }}
+          >
+            New Game
+          </Button>
+        </div>
+      </div>
     );
+  }
+
+  if (isCreating) {
+    return (
+      <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+        <div className="content-block fade-in" style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 'var(--spacing-xl)',
+          padding: 'var(--spacing-2xl)',
+          width: '100%',
+          maxWidth: `${UI_CONFIG.GAME_MAX_WIDTH}px`,
+          borderRadius: 'var(--radius-2xl)'
+        }}>
+          <GameCreationLoader step={'submitting'} />
+        </div>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+      <div className="content-block fade-in" style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 'var(--spacing-xl)',
+        padding: 'var(--spacing-2xl)',
+        width: '100%',
+        maxWidth: `${UI_CONFIG.GAME_MAX_WIDTH}px`,
+        borderRadius: 'var(--radius-2xl)'
+      }}>
+        <h3>Start New Game</h3>
+        <p className="new-game-description">
+          Set the range for your number guessing game
+        </p>
+        <div className="new-game-inputs">
+          <div className="input-group">
+            <label htmlFor="new-game-min-value">Minimum Number</label>
+            <TextField 
+              inputRef={refMin} 
+              id="new-game-min-value" 
+              label="Min" 
+              variant="outlined"
+              type="number"
+              fullWidth
+            />
+          </div>
+          <div className="input-group">
+            <label htmlFor="new-game-max-value">Maximum Number</label>
+            <TextField 
+              inputRef={refMax} 
+              id="new-game-max-value" 
+              label="Max" 
+              variant="outlined"
+              type="number"
+              fullWidth
+            />
+          </div>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained"
+            size="large"
+            sx={{ width: '100%', maxWidth: '300px' }}
+          >
+            Start New Game
+          </Button>
+        </div>
+      </div>
+    </Box>
+  );
 }
 
-function onMutationEvent(callback: () => void, transactionContext: any) : (event: any) => void {
-    return  (event: any) => {
-        if(event.value === pending) {
-            transactionContext.addTransaction(
-                event.id,
-                'pending',
-                "Preparing transaction..."
-            );
-            return;
-        }
-        if (event.value instanceof MutationError) {
-            transactionContext.updateTransaction(event.id, {
-                state: 'error',
-                error: "Failed to submit transaction"
-            });
-            return;
-        }
-        switch (event.value.type) {
-            case "finalized":
-                if (event.value.ok) {
-                    transactionContext.updateTransaction(event.id, {
-                        state: 'finalized',
-                        message: "Transaction confirmed!",
-                        txHash: event.value.txHash
-                    });
-                    callback();
-                } else {
-                    console.error(event)
-                    transactionContext.updateTransaction(event.id, {
-                        state: 'error',
-                        error: "Transaction failed: " + event.value?.dispatchError?.value?.value?.type
-                    });
-                }
-                break;
-            default:
-                transactionContext.updateTransaction(event.id, {
-                    state: 'submitted',
-                    message: "Transaction submitted, waiting for confirmation..."
-                });
-        }
+function onMutationEvent(callback: () => void): (event: MutationEvent) => void {
+  return (event: MutationEvent) => {
+    if (event.value === pending) {
+      toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
+      return;
     }
+    
+    if (event.value instanceof MutationError) {
+      toast.error(TOAST_MESSAGES.TRANSACTION_ERROR, { id: event.id });
+      return;
+    }
+    
+    switch (event.value.type) {
+      case "finalized":
+        if (event.value.ok) {
+          toast.success(`${TOAST_MESSAGES.TRANSACTION_SUCCESS}: ${event.value.txHash}`, { id: event.id });
+          callback();
+        } else {
+          console.error("Transaction failed:", event);
+          toast.error(`${TOAST_MESSAGES.TRANSACTION_ERROR}: ${event.value?.dispatchError?.value?.value?.type}`, { id: event.id });
+        }
+        break;
+      default:
+        toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
+    }
+  };
+}
+
+export function UnifiedGameInterface() {
+  const { game, getAttempts } = useContext(GameContext);
+  const [showNewGameForm, setShowNewGameForm] = useState(false);
+
+  if (!game) {
+    return <NewGame />;
+  }
+
+  if (showNewGameForm) {
+    return (
+      <div>
+        <NewGame onGameCreated={() => setShowNewGameForm(false)} />
+        <div style={{ textAlign: 'center', marginTop: 'var(--spacing-lg)' }}>
+          <Button 
+            onClick={() => setShowNewGameForm(false)}
+            variant="outlined"
+            color="secondary"
+          >
+            ← Back to Current Game
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return <CurrentGameWithAbandon onStartNewGame={() => setShowNewGameForm(true)} />;
+}
+
+export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () => void }) {
+  const { game, getAttempts } = useContext(GameContext);
+
+  const renderAttemptResult = (attempt: Attempt): string => {
+    if (!attempt.clue) {
+      return `Attempt ${attempt.attemptNumber} - Waiting for the result for number ${attempt.guess}`;
+    }
+    
+    switch (attempt.clue.type as ClueType) {
+      case "Less":
+        return `Attempt ${attempt.attemptNumber} - My number is less than ${attempt.guess}`;
+      case "More":
+        return `Attempt ${attempt.attemptNumber} - My number is more than ${attempt.guess}`;
+      case "Found":
+        return `Attempt ${attempt.attemptNumber} - Congrats, you found the number ${attempt.guess}!`;
+      default:
+        return "";
+    }
+  };
+
+  return (
+    <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+      <div className="content-block fade-in" style={{
+        width: '100%',
+        maxWidth: `${UI_CONFIG.GAME_MAX_WIDTH}px`,
+        padding: '30px',
+        borderRadius: 'var(--radius-2xl)'
+      }}>
+        <div className="game-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
+            <h3>Current Game</h3>
+            <Button 
+              onClick={onStartNewGame}
+              variant="outlined"
+              color="error"
+              size="small"
+              className="abandon-game-button"
+            >
+              Abandon & New Game
+            </Button>
+          </div>
+          <p className="game-range">
+            Guess the number between <span className="highlight-number">{game.min_number}</span> and <span className="highlight-number">{game.max_number}</span>
+          </p>
+        </div>
+        
+        <div className="attempts-history">
+          <h4>Attempts History</h4>
+          <div className="attempts-list">
+            {getAttempts().map(attempt => (
+              <div key={attempt.attemptNumber} className="attempt-item">
+                <div className="attempt-number">Attempt {attempt.attemptNumber}</div>
+                <div className="attempt-result">
+                  {renderAttemptResult(attempt)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div className="make-guess-section">
+          <MakeGuess />
+        </div>
+      </div>
+    </Box>
+  );
 }
 
 export function Game() {
-
-    const resetQueryError = useQueryErrorResetter();
-    return (
-        <Box sx={{
-            minHeight: '100vh',
-            background: 'linear-gradient(135deg, #101010 0%, #1a1a1a 50%, #101010 100%)',
-            backgroundAttachment: 'fixed'
-        }}>
-            {/* Game Intro Section */}
-            <Box sx={{
-                padding: { xs: "40px 20px 0", sm: "60px 40px 0" },
-                display: 'flex',
-                justifyContent: 'center'
-            }}>
-                <Box
-                    className="content-block fade-in"
-                    sx={{
-                        width: '100%',
-                        maxWidth: '700px',
-                        borderRadius: '24px',
-                        p: { xs: 3, sm: 4 }
-                    }}
-                >
-                    <GameIntro />
-                </Box>
-            </Box>
-
-            {/* Game Content */}
-            <ErrorBoundary
-                FallbackComponent={ErrorFallback}
-                onReset={() => resetQueryError()}
-            >
-                <Suspense fallback={
-                    <Box sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        minHeight: '200px',
-                        padding: '40px 20px'
-                    }}>
-                        <Box className="content-block fade-in" sx={{
-                            textAlign: 'center',
-                            p: 4,
-                            borderRadius: '16px'
-                        }}>
-                            <Typography variant="h6" sx={{ color: '#64b5f6', mb: 2 }}>
-                                Loading Game...
-                            </Typography>
-                            <BlockchainLoader message="Connecting to blockchain..." />
-                        </Box>
-                    </Box>
-                }>
-                    <CurrentGame />
-                    <NewGame />
-                </Suspense>
-            </ErrorBoundary>
-        </Box>
-    );
+  const resetQueryError = useQueryErrorResetter();
+  const { game } = useContext(GameContext);
+  
+  return (
+    <div>
+      <ErrorBoundary
+        FallbackComponent={ErrorFallback}
+        onReset={() => resetQueryError()}
+      >
+        <Suspense fallback={<h2>Loading game...</h2>}>
+          <UnifiedGameInterface />
+        </Suspense>
+      </ErrorBoundary>
+    </div>
+  );
 }
 
 function ErrorFallback({ resetErrorBoundary }: FallbackProps) {
-    return (
-        <article>
-            <header>
-                <strong>Oops, something went wrong!</strong>
-            </header>
-            <button type="button" onClick={() => resetErrorBoundary()}>
-                Retry
-            </button>
-        </article>
-    );
+  return (
+    <div className="content-block" style={{
+      padding: 'var(--spacing-xl)',
+      textAlign: 'center',
+      borderRadius: 'var(--radius-2xl)'
+    }}>
+      <h3>{ERROR_MESSAGES.SOMETHING_WRONG}</h3>
+      <p style={{ margin: 'var(--spacing-lg) 0' }}>
+        An error occurred while loading the game. Please try again.
+      </p>
+      <Button 
+        onClick={() => resetErrorBoundary()} 
+        variant="contained"
+        sx={{ marginTop: 'var(--spacing-md)' }}
+      >
+        Retry
+      </Button>
+    </div>
+  );
 }

@@ -26,6 +26,7 @@
     "@polkadot-api/sdk-ink": "^0.4.0",
     "@polkadot/keyring": "^13.5.6",
     "@reactive-dot/react": "^0.46.2",
+    "@types/three": "^0.180.0",
     "dayjs": "^1.11.18",
     "dot-connect": "^0.22.1",
     "polkadot-api": "*",
@@ -33,6 +34,7 @@
     "react-dom": "latest",
     "react-error-boundary": "^6.0.0",
     "react-hot-toast": "^2.5.2",
+    "three": "^0.180.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {

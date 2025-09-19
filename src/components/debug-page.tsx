@@ -458,25 +458,6 @@ export function DebugPage() {
                   fullWidth
                   variant="outlined"
                   onClick={() => {
-                    const url = 'https://polkadot.js.org/apps/?rpc=wss://testnet-passet-hub.polkadot.io#/explorer';
-                    window.open(url, '_blank');
-                  }}
-                  sx={{
-                    borderColor: '#4caf50',
-                    color: '#4caf50',
-                    '&:hover': {
-                      borderColor: '#2e7d32',
-                      backgroundColor: 'rgba(76, 175, 80, 0.1)'
-                    }
-                  }}
-                >
-                  <NetworkCheck sx={{ mr: 1 }} />
-                  Explorer
-                </Button>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => {
                     const contractInfo = {
                       address: '0xD6Ad3e67e2514bED804acc45945A7a102C4c6Ae4',
                       network: 'PASETO Network',

@@ -122,21 +122,21 @@ function buildEventObserver(toastId: string,  successMessage: string, callback: 
             } else if (event.type === "finalized") {
                 message = "Finalized tx with hash: " + event.txHash;
             }
-            const network = "pah";
+            const network = "pop";
             const toastValue = (_: any) => (
                 <span className="toast-tx-result text-right">
                     {message}<br/><a target="_blank" href={"https://"+network+".subscan.io/extrinsic/"+event?.txHash}>show in Subscan</a>
                  </span>
             );
-            toast.loading(toastValue, {id: toastId});
+            toast.loading(toastValue, {id: txToast});
         },
         error: (message) => {
             console.error(message)
-            toast.dismiss(toastId);
+            toast.dismiss(txToast);
             toast.error(message);
         },
         complete: () => {
-            toast.dismiss(toastId);
+            toast.dismiss(txToast);
             toast.success(successMessage, { duration: 5000 });
             callback();
         }

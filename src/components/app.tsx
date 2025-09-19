@@ -1,23 +1,23 @@
 import {config} from "../config";
 import "../styles/globals.css";
-import {ChainProvider, ReactiveDotProvider, SignerProvider} from "@reactive-dot/react";
+import {ChainProvider, ReactiveDotProvider, SignerProvider, useAccounts} from "@reactive-dot/react";
 import {Suspense, useState} from "react";
 import {ConnectionButton} from "dot-connect/react.js";
-import {Game} from "./game.tsx";
+import {BlockchainGame} from "./blockchain-game.tsx";
 import {DebugPage} from "./debug-page.tsx";
-import {ContractExplorer} from "./contract-explorer.tsx";
 import {Toaster} from "react-hot-toast";
 import {GameContextProvider} from "../contexts/game-context.tsx";
 import {AccountSelect} from "./account-select.tsx";
 import {TransactionProvider} from "./transaction-provider.tsx";
 import {ConnectionStatus, NetworkInfo} from "./connection-status.tsx";
+import {ConnectionStatusCompact} from "./connection-status-compact.tsx";
 import {BlockchainLoader} from "./blockchain-loader.tsx";
 import { Box, Button, ButtonGroup, AppBar, Toolbar, Typography, Alert } from "@mui/material";
 import { Games, BugReport, AccountBalance, SmartToy, Refresh } from "@mui/icons-material";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 export function App() {
-    const [currentPage, setCurrentPage] = useState<'game' | 'debug' | 'explorer'>('game');
+    const [currentPage, setCurrentPage] = useState<'game' | 'debug'>('game');
 
     return (
         <ReactiveDotProvider config={config}>
@@ -36,8 +36,8 @@ export function App() {
                     justifyContent: 'space-between',
                     alignItems: 'center'
                 }}>
-                    <Typography variant="h6" sx={{ color: '#64b5f6' }}>
-                        Guess the Number
+                    <Typography variant="h6" sx={{ color: '#d4af37', fontFamily: 'Cinzel, serif', fontWeight: 700 }}>
+                        🔮 Blockchain Oracle
                     </Typography>
 
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -49,20 +49,12 @@ export function App() {
                             Game
                         </Button>
                         <Button
-                            onClick={() => setCurrentPage('explorer')}
-                            variant={currentPage === 'explorer' ? 'contained' : 'outlined'}
-                            size="small"
-                        >
-                            Explorer
-                        </Button>
-                        <Button
                             onClick={() => setCurrentPage('debug')}
                             variant={currentPage === 'debug' ? 'contained' : 'outlined'}
                             size="small"
                         >
                             Debug
                         </Button>
-
 
                         <Suspense fallback={<Button disabled>Loading...</Button>}>
                             <ConnectionButton />
@@ -71,13 +63,7 @@ export function App() {
                 </Box>
 
                 {/* Main Content */}
-                <Box sx={{ pt: 8, padding: '20px' }}>
-                    {/* Debug Info */}
-                    <Box sx={{ mb: 2 }}>
-                        <Alert severity="info" sx={{ mb: 1 }}>
-                            <strong>Debug Info:</strong> Current Page: {currentPage}
-                        </Alert>
-                    </Box>
+                <Box sx={{ pt: 8, padding: '20px', maxWidth: '1600px', margin: '0 auto' }}>
 
                     {/* Mode en ligne uniquement - Connexion directe au réseau PASETO */}
                     <ChainProvider chainId="pah">
@@ -132,28 +118,24 @@ export function App() {
                                 )}
                                 onError={(error) => console.error('Blockchain connection error:', error)}
                             >
-                                <AccountSelect>
+                                <AutoAccountSelect>
                                     {(selectedAccount) => (
                                         <SignerProvider signer={selectedAccount.polkadotSigner}>
                                             <TransactionProvider>
-                                                {/* Status de connexion */}
-                                                <Box sx={{ mb: 2 }}>
-                                                    <ConnectionStatus />
-                                                    <NetworkInfo />
-                                                </Box>
+                                                {/* Status de connexion compact */}
+                                                <ConnectionStatusCompact />
 
                                                 {/* Contenu principal selon la page */}
                                                 {currentPage === 'game' && (
                                                     <GameContextProvider>
-                                                        <Game/>
+                                                        <BlockchainGame/>
                                                     </GameContextProvider>
                                                 )}
-                                                {currentPage === 'explorer' && <ContractExplorer />}
                                                 {currentPage === 'debug' && <DebugPage />}
                                             </TransactionProvider>
                                         </SignerProvider>
                                     )}
-                                </AccountSelect>
+                                </AutoAccountSelect>
                             </ErrorBoundary>
                         </Suspense>
                     </ChainProvider>
@@ -182,4 +164,22 @@ export function App() {
             />
         </ReactiveDotProvider>
     );
+}
+
+// Composant qui sélectionne automatiquement le premier compte disponible
+function AutoAccountSelect({ children }: { children: (account: any) => React.ReactNode }) {
+    const accounts = useAccounts();
+
+    // Utilise automatiquement le premier compte disponible
+    const selectedAccount = accounts.length > 0 ? accounts[0] : undefined;
+
+    if (!selectedAccount) {
+        return (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#b0b0b0' }}>
+                <p>🔌 Veuillez connecter un wallet pour continuer</p>
+            </div>
+        );
+    }
+
+    return <>{children(selectedAccount)}</>;
 }

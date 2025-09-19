@@ -1,0 +1,65 @@
+/* CSS Variables for consistent theming */
+:root {
+  /* Colors */
+  --color-primary: #d4af37;
+  --color-primary-dark: #b8860b;
+  --color-secondary: #64b5f6;
+  --color-success: #4caf50;
+  --color-error: #f44336;
+  --color-warning: #ff9800;
+  
+  /* Background colors */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a0033;
+  --bg-tertiary: #101010;
+  --bg-card: rgba(32, 33, 37, 0.3);
+  --bg-card-hover: rgba(32, 33, 37, 0.5);
+  
+  /* Text colors */
+  --text-primary: #e0e0e0;
+  --text-secondary: #b0b0b0;
+  --text-muted: #888;
+  
+  /* Border colors */
+  --border-primary: rgba(255, 255, 255, 0.2);
+  --border-secondary: rgba(212, 175, 55, 0.3);
+  --border-focus: rgba(212, 175, 55, 0.5);
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(212, 175, 55, 0.3);
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  /* Fonts */
+  --font-primary: 'Poppins', sans-serif;
+  --font-heading: 'Cinzel', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  /* Z-index */
+  --z-background: -1;
+  --z-content: 1;
+  --z-header: 1000;
+  --z-modal: 2000;
+}
+
