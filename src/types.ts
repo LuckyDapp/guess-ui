@@ -72,3 +72,26 @@ export interface ThemeColors {
   text: string;
   textSecondary: string;
 }
+
+// Transaction history types
+export interface TransactionHistory {
+  id: string;
+  timestamp: number;
+  txHash?: string;
+  blockNumber?: number;
+  call: string;
+  parameters: Record<string, any>;
+  status: 'pending' | 'submitted' | 'finalized' | 'error';
+  error?: string;
+  gasUsed?: string;
+  fee?: string;
+}
+
+// Transaction history context types
+export interface TransactionHistoryContextType {
+  transactions: TransactionHistory[];
+  addTransaction: (transaction: Omit<TransactionHistory, 'id' | 'timestamp'>) => string;
+  updateTransaction: (id: string, updates: Partial<TransactionHistory>) => void;
+  clearHistory: () => void;
+  getTransactionsByCall: (call: string) => TransactionHistory[];
+}

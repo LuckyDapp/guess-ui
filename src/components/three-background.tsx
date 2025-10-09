@@ -17,6 +17,22 @@ export const ThreeBackground: React.FC<ThreeBackgroundProps> = ({ className = ''
   useEffect(() => {
     if (!containerRef.current || isInitializedRef.current) return;
 
+    // Check WebGL support
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) {
+      console.warn('WebGL not supported, using CSS fallback background');
+      // Add CSS fallback background
+      if (containerRef.current) {
+        containerRef.current.style.background = `
+          radial-gradient(circle at 20% 20%, rgba(212, 175, 55, 0.1) 0%, transparent 50%),
+          radial-gradient(circle at 80% 80%, rgba(184, 134, 11, 0.1) 0%, transparent 50%),
+          linear-gradient(135deg, #0f0f23 0%, #2a0a3a 100%)
+        `;
+      }
+      return;
+    }
+
     // Clear any existing content
     containerRef.current.innerHTML = '';
     
@@ -31,10 +47,18 @@ export const ThreeBackground: React.FC<ThreeBackgroundProps> = ({ className = ''
       THREE_CONFIG.CAMERA_NEAR, 
       THREE_CONFIG.CAMERA_FAR
     );
-    const renderer = new THREE.WebGLRenderer({ 
-      alpha: true,
-      antialias: true
-    });
+    let renderer: THREE.WebGLRenderer;
+    
+    try {
+      renderer = new THREE.WebGLRenderer({ 
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance"
+      });
+    } catch (error) {
+      console.warn('WebGL not supported, falling back to Canvas renderer:', error);
+      renderer = new THREE.CanvasRenderer();
+    }
 
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -78,16 +102,24 @@ export const ThreeBackground: React.FC<ThreeBackgroundProps> = ({ className = ''
     // Animation loop
     let animationId: number;
     const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      
-      // Rotate particles
-      if (particles) {
-        particles.rotation.x += THREE_CONFIG.ROTATION_SPEED_X;
-        particles.rotation.y += THREE_CONFIG.ROTATION_SPEED_Y;
+      try {
+        animationId = requestAnimationFrame(animate);
+        
+        // Rotate particles
+        if (particles) {
+          particles.rotation.x += THREE_CONFIG.ROTATION_SPEED_X;
+          particles.rotation.y += THREE_CONFIG.ROTATION_SPEED_Y;
+        }
+        
+        // Render the scene
+        renderer.render(scene, camera);
+      } catch (error) {
+        console.error('Error in Three.js animation loop:', error);
+        // Stop animation on error
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
       }
-      
-      // Render the scene
-      renderer.render(scene, camera);
     };
 
     // Start animation

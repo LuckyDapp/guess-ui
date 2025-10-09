@@ -7,6 +7,9 @@ import {registerDotConnect} from "dot-connect";
 const PAH_RPC = "wss://testnet-passet-hub.polkadot.io";
 const PAH_CONTRACT_ADDRESS = "0xe75cbD47620dBb2053CF2A98D06840f06baAf141";
 
+// Fallback RPC en cas d'erreur de connexion
+const FALLBACK_RPC = "wss://rpc.polkadot.io";
+
 export const config = defineConfig({
     chains: {
         pah: {

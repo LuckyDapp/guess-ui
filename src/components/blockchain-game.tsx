@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { Game } from "./game.tsx";
+import { GameWithHistory } from "./game-with-history.tsx";
 import { ThreeBackground } from "./three-background.tsx";
 
 export function BlockchainGame() {
+  const useHistoryTracking = true; // Toujours actif
+
   useEffect(() => {
     const cube = document.querySelector('#background-cube .cube');
     if (!cube) return;
@@ -14,28 +17,29 @@ export function BlockchainGame() {
     let speed = 1;
     
     const handleMouseMove = (e) => {
-      const rect = document.querySelector('#background-cube').getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
+      // Use the entire viewport for mouse tracking since cube is now smaller
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
       
       const deltaX = e.clientX - centerX;
       const deltaY = e.clientY - centerY;
       const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      const maxDistance = Math.sqrt(rect.width * rect.width + rect.height * rect.height) / 2;
+      const maxDistance = Math.sqrt(window.innerWidth * window.innerWidth + window.innerHeight * window.innerHeight) / 2;
       
       speed = 1 + (1 - Math.min(distance / maxDistance, 1)) * 3;
       
-      targetX = (deltaY / rect.height) * 2;
-      targetY = (deltaX / rect.width) * 2;
+      // Increased rotation intensity for more movement (fixed inverted Y)
+      targetX = (-deltaY / window.innerHeight) * 2.5;
+      targetY = (deltaX / window.innerWidth) * 2.5;
     };
     
     const animate = () => {
-      const lerpFactor = 0.1 * speed;
+      const lerpFactor = 0.12 * speed;
       currentX += (targetX - currentX) * lerpFactor;
       currentY += (targetY - currentY) * lerpFactor;
       
-      cube.style.setProperty('--rotateX', `${currentX * 30}deg`);
-      cube.style.setProperty('--rotateY', `${currentY * 30}deg`);
+      cube.style.setProperty('--rotateX', `${currentX * 25}deg`);
+      cube.style.setProperty('--rotateY', `${currentY * 25}deg`);
       
       requestAnimationFrame(animate);
     };
@@ -48,23 +52,42 @@ export function BlockchainGame() {
     };
   }, []);
 
+
   return (
-    <div className="container">
+    <div className="container" style={{ 
+      minHeight: '100%', 
+      overflow: 'visible',
+      position: 'relative',
+      zIndex: 1
+    }}>
+      {/* Bouton de contrôle */}
+
       {/* Three.js Background */}
       <ThreeBackground />
 
-      {/* Intro Section */}
-      <section className="intro" id="intro">
-        <p className="intro-text">
-          Find the hidden number in the blockchain
-        </p>
-      </section>
 
       {/* Game Section */}
       <section className="game" id="game">
         <div className="game-container">
-          <h2>Guess the Number</h2>
-          <Game />
+          <div className="title-with-cube">
+            {/* Background Cube - Positioned to the left of title */}
+            <div id="background-cube">
+              <div className="cube-container">
+                <div className="cube advanced-cube">
+                  <div className="face front">
+                    <img src="/polkadot-new-dot-logo.svg" alt="Polkadot" className="crypto-logo" />
+                  </div>
+                  <div className="face back">⟲</div>
+                  <div className="face right">Ξ</div>
+                  <div className="face left">◎</div>
+                  <div className="face top">⛓</div>
+                  <div className="face bottom">△</div>
+                </div>
+              </div>
+            </div>
+            <h2>Guess the Number</h2>
+          </div>
+          {useHistoryTracking ? <GameWithHistory /> : <Game />}
         </div>
       </section>
 
@@ -81,21 +104,6 @@ export function BlockchainGame() {
         </p>
       </footer>
       
-      {/* Background Cube - Fixed position */}
-      <div id="background-cube">
-        <div className="cube-container">
-          <div className="cube advanced-cube">
-            <div className="face front">
-              <img src="/polkadot-new-dot-logo.svg" alt="Polkadot" className="crypto-logo" />
-            </div>
-            <div className="face back">⟲</div>
-            <div className="face right">Ξ</div>
-            <div className="face left">◎</div>
-            <div className="face top">⛓</div>
-            <div className="face bottom">△</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

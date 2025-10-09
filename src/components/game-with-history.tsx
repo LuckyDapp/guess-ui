@@ -1,16 +1,14 @@
 import { Suspense, useContext, useRef, useState, useEffect } from "react";
 import { Box, Button, TextField, Typography } from "@mui/material";
 import { GameContext } from "../contexts/game-context.tsx";
-import { getContractAddress, gtnContract } from "../config.ts";
 import { toast } from "react-hot-toast";
-import { useContractMutation, useMutationEffect, useQueryErrorResetter, useChainId } from "@reactive-dot/react";
-import { MutationError, pending } from "@reactive-dot/core";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
-import type { MutationEvent } from "@reactive-dot/react/src/contexts/mutation.tsx";
 import { isPositiveNumber } from "../utils/number-utils.ts";
 import type { Attempt, ClueType } from "../types.ts";
 import { ERROR_MESSAGES, TOAST_MESSAGES, UI_CONFIG } from "../constants";
 import { MiniGames } from "./mini-games.tsx";
+import { useTransactionWithHistory } from "../hooks/use-transaction-with-history";
+import { useQueryErrorResetter } from "@reactive-dot/react";
 
 // Loading animation component
 function GameCreationLoader({ step }: { step: 'submitting' | 'finalizing' | 'syncing' }) {
@@ -95,20 +93,13 @@ function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' }
   );
 }
 
-
-export function MakeGuess() {
-  const chainId = useChainId();
-  const contractAddress = getContractAddress(chainId);
+export function MakeGuessWithHistory() {
   const { refreshGuesses, getAttempts } = useContext(GameContext);
+  const { makeGuessWithHistory } = useTransactionWithHistory();
   const inputNumber = useRef<HTMLInputElement>(null);
   const [hasPendingAttempt, setHasPendingAttempt] = useState(false);
   const [guessStep, setGuessStep] = useState<'submitting' | 'finalizing' | 'syncing' | 'idle'>('idle');
-
-  const [_, makeGuess] = useContractMutation((mutate) =>
-    mutate(gtnContract, contractAddress, "guess", {
-      data: { "guess": inputNumber.current?.value },
-    }),
-  );
+  const [showMiniGames, setShowMiniGames] = useState(false);
 
   // Check for pending attempts
   useEffect(() => {
@@ -119,6 +110,8 @@ export function MakeGuess() {
         setHasPendingAttempt(hasPending);
         if (!hasPending && guessStep === 'syncing') {
           setGuessStep('idle');
+          // Quand l'attente est terminée, masquer les mini-jeux mais garder l'état
+          setShowMiniGames(false);
         }
       } catch (error) {
         console.warn('Error checking pending attempts:', error);
@@ -146,39 +139,21 @@ export function MakeGuess() {
 
     console.log("Guess:", guessNumber);
     setGuessStep('submitting');
-    makeGuess();
-  };
+    
+    const txId = await makeGuessWithHistory(parseInt(guessNumber), () => {
+      setGuessStep('syncing');
+      refreshGuesses();
+      toast.success(TOAST_MESSAGES.TRANSACTION_SUCCESS);
+    });
 
-  // Local mutation listener to drive in-block status + refresh
-  useMutationEffect((event: MutationEvent) => {
-    if (event.value === pending) {
-      setGuessStep('submitting');
-      toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
-      return;
-    }
-
-    if (event.value instanceof MutationError) {
-      toast.error(TOAST_MESSAGES.TRANSACTION_ERROR, { id: event.id });
+    if (txId) {
+      setGuessStep('finalizing');
+      // Afficher les mini-jeux pendant l'attente
+      setShowMiniGames(true);
+    } else {
       setGuessStep('idle');
-      return;
     }
-
-    switch (event.value.type) {
-      case 'finalized':
-        if (event.value.ok) {
-          toast.success(`${TOAST_MESSAGES.TRANSACTION_SUCCESS}: ${event.value.txHash}`, { id: event.id });
-          setGuessStep('syncing');
-          refreshGuesses();
-        } else {
-          toast.error(`${TOAST_MESSAGES.TRANSACTION_ERROR}: ${event.value?.dispatchError?.value?.value?.type}`, { id: event.id });
-          setGuessStep('idle');
-        }
-        break;
-      default:
-        setGuessStep('finalizing');
-        toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
-    }
-  });
+  };
 
   return (
     <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
@@ -200,25 +175,96 @@ export function MakeGuess() {
         )}
         
         {(!hasPendingAttempt && guessStep === 'idle') ? (
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%' }}>
-            <TextField 
-              inputRef={inputNumber} 
-              id="guess-number-value" 
-              label="Enter your number" 
-              variant="outlined"
-              fullWidth
-            />
-            <Button 
-              onClick={handleSubmit} 
-              variant="contained"
-              sx={{ minWidth: '140px' }}
-            >
-              Make a guess
-            </Button>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }}>
+            {/* Formulaire de guess */}
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%' }}>
+              <TextField 
+                inputRef={inputNumber} 
+                id="guess-number-value" 
+                label="Enter your number" 
+                variant="outlined"
+                fullWidth
+              />
+              <Button 
+                onClick={handleSubmit} 
+                variant="contained"
+                sx={{ minWidth: '140px' }}
+              >
+                Make a guess
+              </Button>
+            </Box>
+            
+            {/* Bouton pour reprendre les mini-jeux */}
+            {showMiniGames && (
+              <Box sx={{ textAlign: 'center', mt: 2 }}>
+                <Button 
+                  onClick={() => setShowMiniGames(true)}
+                  variant="outlined"
+                  sx={{ 
+                    borderColor: 'var(--color-primary)',
+                    color: 'var(--color-primary)',
+                    '&:hover': {
+                      borderColor: 'var(--color-primary)',
+                      backgroundColor: 'rgba(100, 181, 246, 0.1)'
+                    }
+                  }}
+                >
+                  🎮 Reprendre les mini-jeux
+                </Button>
+              </Box>
+            )}
           </Box>
         ) : (
           <Box sx={{ width: '100%', textAlign: 'center' }}>
             <MiniGames onComplete={() => {}} />
+          </Box>
+        )}
+        
+        {/* Mini-jeux en mode pause/overlay */}
+        {showMiniGames && (!hasPendingAttempt && guessStep === 'idle') && (
+          <Box sx={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}>
+            <Box sx={{ 
+              backgroundColor: 'var(--background)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '20px',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative'
+            }}>
+              <Button
+                onClick={() => setShowMiniGames(false)}
+                sx={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  minWidth: 'auto',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                  color: '#f44336',
+                  '&:hover': {
+                    backgroundColor: 'rgba(244, 67, 54, 0.2)'
+                  }
+                }}
+              >
+                ✕
+              </Button>
+              <MiniGames onComplete={() => setShowMiniGames(false)} />
+            </Box>
           </Box>
         )}
       </div>
@@ -226,31 +272,12 @@ export function MakeGuess() {
   );
 }
 
-
-export function NewGame({ compact = false, onGameCreated, onBack }: { compact?: boolean; onGameCreated?: () => void; onBack?: () => void }) {
-  const chainId = useChainId();
-  const contractAddress = getContractAddress(chainId);
+export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: { compact?: boolean; onGameCreated?: () => void; onBack?: () => void }) {
   const { refreshGame } = useContext(GameContext);
+  const { startNewGameWithHistory } = useTransactionWithHistory();
   const refMin = useRef<HTMLInputElement>(null);
   const refMax = useRef<HTMLInputElement>(null);
   const [isCreating, setIsCreating] = useState(false);
-
-  const [__, newGame] = useContractMutation((mutate) =>
-    mutate(gtnContract, contractAddress, "start_new_game", {
-      data: { 
-        "min_number": refMin.current?.value, 
-        "max_number": refMax.current?.value 
-      },
-    }),
-  );
-
-  useMutationEffect(onMutationEvent(() => {
-    refreshGame();
-    setIsCreating(false);
-    if (onGameCreated) {
-      onGameCreated();
-    }
-  }));
 
   const handleSubmit = async () => {
     const minNumber = refMin.current?.value;
@@ -273,7 +300,19 @@ export function NewGame({ compact = false, onGameCreated, onBack }: { compact?: 
 
     console.log("Start new game:", minNumber, "-", maxNumber);
     setIsCreating(true);
-    newGame();
+    
+    const txId = await startNewGameWithHistory(parseInt(minNumber), parseInt(maxNumber), () => {
+      refreshGame();
+      setIsCreating(false);
+      if (onGameCreated) {
+        onGameCreated();
+      }
+      toast.success(TOAST_MESSAGES.TRANSACTION_SUCCESS);
+    });
+
+    if (!txId) {
+      setIsCreating(false);
+    }
   };
 
   if (compact) {
@@ -418,55 +457,27 @@ export function NewGame({ compact = false, onGameCreated, onBack }: { compact?: 
   );
 }
 
-function onMutationEvent(callback: () => void): (event: MutationEvent) => void {
-  return (event: MutationEvent) => {
-    if (event.value === pending) {
-      toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
-      return;
-    }
-    
-    if (event.value instanceof MutationError) {
-      toast.error(TOAST_MESSAGES.TRANSACTION_ERROR, { id: event.id });
-      return;
-    }
-    
-    switch (event.value.type) {
-      case "finalized":
-        if (event.value.ok) {
-          toast.success(`${TOAST_MESSAGES.TRANSACTION_SUCCESS}: ${event.value.txHash}`, { id: event.id });
-          callback();
-        } else {
-          console.error("Transaction failed:", event);
-          toast.error(`${TOAST_MESSAGES.TRANSACTION_ERROR}: ${event.value?.dispatchError?.value?.value?.type}`, { id: event.id });
-        }
-        break;
-      default:
-        toast.loading(TOAST_MESSAGES.TRANSACTION_LOADING, { id: event.id });
-    }
-  };
-}
-
-export function UnifiedGameInterface() {
+export function UnifiedGameInterfaceWithHistory() {
   const { game, getAttempts } = useContext(GameContext);
   const [showNewGameForm, setShowNewGameForm] = useState(false);
 
   if (!game) {
-    return <NewGame />;
+    return <NewGameWithHistory />;
   }
 
   if (showNewGameForm) {
     return (
-      <NewGame 
+      <NewGameWithHistory 
         onGameCreated={() => setShowNewGameForm(false)} 
         onBack={() => setShowNewGameForm(false)}
       />
     );
   }
 
-  return <CurrentGameWithAbandon onStartNewGame={() => setShowNewGameForm(true)} />;
+  return <CurrentGameWithAbandonAndHistory onStartNewGame={() => setShowNewGameForm(true)} />;
 }
 
-export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () => void }) {
+export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNewGame: () => void }) {
   const { game, getAttempts } = useContext(GameContext);
 
   const renderAttemptResult = (attempt: Attempt): string => {
@@ -527,14 +538,14 @@ export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () 
         </div>
         
         <div className="make-guess-section">
-          <MakeGuess />
+          <MakeGuessWithHistory />
         </div>
       </div>
     </Box>
   );
 }
 
-export function Game() {
+export function GameWithHistory() {
   const resetQueryError = useQueryErrorResetter();
   const { game } = useContext(GameContext);
   
@@ -545,7 +556,7 @@ export function Game() {
         onReset={() => resetQueryError()}
       >
         <Suspense fallback={<h2>Loading game...</h2>}>
-          <UnifiedGameInterface />
+          <UnifiedGameInterfaceWithHistory />
         </Suspense>
       </ErrorBoundary>
     </div>
@@ -573,3 +584,5 @@ function ErrorFallback({ resetErrorBoundary }: FallbackProps) {
     </div>
   );
 }
+
+

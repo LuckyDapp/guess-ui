@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useEffect, useState, type ReactNode } from 'react';
 import type { Attempt, Game, GameContextType } from "../types.ts";
 import { getOrCreateContract } from "../contract.tsx";
 import { encodeAddress } from "@polkadot/keyring";
@@ -14,6 +14,13 @@ function updateAttempts(attempts: Attempt[], game: Game){
     if (game == undefined){
         return attempts;
     }
+    
+    // Vérifier que le jeu a la structure attendue
+    if (typeof game !== 'object' || !('game_number' in game) || !('attempt' in game)) {
+        console.warn("Invalid game structure in updateAttempts:", game);
+        return attempts;
+    }
+    
     const guess = game.last_guess;
     if (guess == undefined){
         return attempts;
@@ -55,8 +62,15 @@ export const GameContextProvider = ({ children }: GameContextProviderProps) => {
                 .getCurrentGame(signer)
                 .then(
                     (game) => {
-                        setGame(game);
-                        setAttempts(updateAttempts([], game));
+                        // Vérifier que le jeu a la structure attendue
+                        if (game && typeof game === 'object' && 'game_number' in game) {
+                            setGame(game);
+                            setAttempts(updateAttempts([], game));
+                        } else {
+                            console.warn("Invalid game data structure:", game);
+                            setGame(undefined);
+                            setAttempts([]);
+                        }
                     }
                 ).catch((e) => {
                     console.warn("Error loading game:", e);
@@ -75,8 +89,14 @@ export const GameContextProvider = ({ children }: GameContextProviderProps) => {
                 .getCurrentGame(signer)
                 .then(
                     (game) => {
-                        setGame(game);
-                        setAttempts(updateAttempts(attempts, game));
+                        // Vérifier que le jeu a la structure attendue
+                        if (game && typeof game === 'object' && 'game_number' in game) {
+                            setGame(game);
+                            setAttempts(updateAttempts(attempts, game));
+                        } else {
+                            console.warn("Invalid game data structure when refreshing attempts:", game);
+                            setAttempts([]);
+                        }
                     }
                 ).catch((e) => {
                     console.warn("Error refreshing attempts:", e);

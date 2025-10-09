@@ -3,18 +3,19 @@ import { Box, Typography, Button } from '@mui/material';
 
 interface MiniGamesProps {
   onComplete?: () => void;
+  externalPaused?: boolean;
 }
 
-export function MiniGames({ onComplete }: MiniGamesProps) {
+export function MiniGames({ onComplete, externalPaused = false }: MiniGamesProps) {
   const [currentGame, setCurrentGame] = useState<'memory' | 'stars' | null>(null);
   const [score, setScore] = useState(0);
 
   if (currentGame === 'memory') {
-    return <MemoryGame onComplete={() => setCurrentGame(null)} onScore={(points) => setScore(score + points)} />;
+    return <MemoryGame onComplete={() => setCurrentGame(null)} onScore={(points) => setScore(score + points)} externalPaused={externalPaused} />;
   }
 
   if (currentGame === 'snake') {
-    return <SnakeGame onComplete={() => setCurrentGame(null)} onScore={(points) => setScore(score + points)} />;
+    return <SnakeGame onComplete={() => setCurrentGame(null)} onScore={(points) => setScore(score + points)} externalPaused={externalPaused} />;
   }
 
   return (
@@ -49,7 +50,7 @@ export function MiniGames({ onComplete }: MiniGamesProps) {
 }
 
 // Memory Game Component
-function MemoryGame({ onComplete, onScore }: { onComplete: () => void; onScore: (points: number) => void }) {
+function MemoryGame({ onComplete, onScore, externalPaused = false }: { onComplete: () => void; onScore: (points: number) => void; externalPaused?: boolean }) {
   const [cards, setCards] = useState<number[]>([]);
   const [flippedCards, setFlippedCards] = useState<number[]>([]);
   const [matchedCards, setMatchedCards] = useState<number[]>([]);
@@ -186,7 +187,7 @@ function MemoryGame({ onComplete, onScore }: { onComplete: () => void; onScore: 
 }
 
 // Snake Game Component
-function SnakeGame({ onComplete, onScore }: { onComplete: () => void; onScore: (points: number) => void }) {
+function SnakeGame({ onComplete, onScore, externalPaused = false }: { onComplete: () => void; onScore: (points: number) => void; externalPaused?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
   const [gameActive, setGameActive] = useState(true);
@@ -287,7 +288,7 @@ function SnakeGame({ onComplete, onScore }: { onComplete: () => void; onScore: (
 
   // Game loop
   useEffect(() => {
-    if (!gameActive || !gameStarted || isPaused) return;
+    if (!gameActive || !gameStarted || isPaused || externalPaused) return;
 
     const gameLoop = () => {
       setSnake(prevSnake => {
@@ -342,7 +343,7 @@ function SnakeGame({ onComplete, onScore }: { onComplete: () => void; onScore: (
 
     const interval = setInterval(gameLoop, 150);
     return () => clearInterval(interval);
-  }, [direction, nextDirection, food, gameActive, gameStarted, isPaused, onScore]);
+  }, [direction, nextDirection, food, gameActive, gameStarted, isPaused, externalPaused, onScore]);
 
   // Draw game
   useEffect(() => {
@@ -391,7 +392,7 @@ function SnakeGame({ onComplete, onScore }: { onComplete: () => void; onScore: (
       <Box sx={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
         <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
           {!gameStarted ? 'Press any arrow key to start!' : 
-           isPaused ? '⏸️ PAUSED - Click or press SPACE to resume!' : 
+           isPaused || externalPaused ? '⏸️ PAUSED - Click or press SPACE to resume!' : 
            `Use arrow keys to control the snake! Click or press SPACE to pause. Score: ${score}`}
         </Typography>
       </Box>
