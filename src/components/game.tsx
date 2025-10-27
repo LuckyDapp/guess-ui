@@ -64,7 +64,7 @@ function GameCreationLoader({ step }: { step: 'submitting' | 'finalizing' | 'syn
 }
 
 // Inline status for guess submission
-function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' }) {
+function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' | 'received' }) {
   return (
     <Box sx={{ 
       textAlign: 'left', 
@@ -90,19 +90,22 @@ function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' }
         <Typography variant="body2" sx={{ color: step === 'syncing' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'syncing' ? 700 : 500 }}>
           {step === 'syncing' ? '• Syncing attempts' : '○ Syncing attempts'}
         </Typography>
+        <Typography variant="body2" sx={{ color: step === 'received' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'received' ? 700 : 500 }}>
+          {step === 'received' ? '• Guess received and processed' : '○ Guess received and processed'}
+        </Typography>
       </Box>
     </Box>
   );
 }
 
 
-export function MakeGuess() {
+export function MakeGuess({ onStartNewGame }: { onStartNewGame?: () => void }) {
   const chainId = useChainId();
   const contractAddress = getContractAddress(chainId);
-  const { refreshGuesses, getAttempts } = useContext(GameContext);
+  const { refreshGuesses, getAttempts, isGameCompleted } = useContext(GameContext);
   const inputNumber = useRef<HTMLInputElement>(null);
   const [hasPendingAttempt, setHasPendingAttempt] = useState(false);
-  const [guessStep, setGuessStep] = useState<'submitting' | 'finalizing' | 'syncing' | 'idle'>('idle');
+  const [guessStep, setGuessStep] = useState<'submitting' | 'finalizing' | 'syncing' | 'received' | 'idle'>('idle');
 
   const [_, makeGuess] = useContractMutation((mutate) =>
     mutate(gtnContract, contractAddress, "guess", {
@@ -118,7 +121,11 @@ export function MakeGuess() {
         const hasPending = Array.isArray(attempts) && attempts.some(attempt => !attempt.clue);
         setHasPendingAttempt(hasPending);
         if (!hasPending && guessStep === 'syncing') {
-          setGuessStep('idle');
+          setGuessStep('received');
+          // Attendre un peu avant de passer à idle pour laisser le temps à l'utilisateur de voir le statut "received"
+          setTimeout(() => {
+            setGuessStep('idle');
+          }, 2000);
         }
       } catch (error) {
         console.warn('Error checking pending attempts:', error);
@@ -141,6 +148,12 @@ export function MakeGuess() {
 
     if (!isPositiveNumber(guessNumber)) {
       toast.error(ERROR_MESSAGES.INVALID_NUMBER);
+      return;
+    }
+
+    // Vérifier si le jeu est terminé
+    if (isGameCompleted && isGameCompleted()) {
+      toast.error("🎉 Congratulations! You found the number! The game is complete.");
       return;
     }
 
@@ -200,25 +213,54 @@ export function MakeGuess() {
         )}
         
         {(!hasPendingAttempt && guessStep === 'idle') ? (
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%' }}>
-            <TextField 
-              inputRef={inputNumber} 
-              id="guess-number-value" 
-              label="Enter your number" 
-              variant="outlined"
-              fullWidth
-            />
-            <Button 
-              onClick={handleSubmit} 
-              variant="contained"
-              sx={{ minWidth: '140px' }}
-            >
-              Make a guess
-            </Button>
-          </Box>
+          (isGameCompleted && isGameCompleted()) ? (
+            <Box sx={{ width: '100%', textAlign: 'center', padding: 3 }}>
+              <Typography variant="h5" sx={{ color: 'success.main', fontWeight: 'bold', mb: 2 }}>
+                🎉 Congratulations!
+              </Typography>
+              <Typography variant="h6" sx={{ color: 'text.secondary', mb: 3 }}>
+                You found the number! The game is complete.
+              </Typography>
+              {onStartNewGame && (
+                <Button 
+                  onClick={onStartNewGame}
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  sx={{ 
+                    minWidth: '200px',
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem'
+                  }}
+                >
+                  Start a new game
+                </Button>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', width: '100%' }}>
+              <TextField 
+                inputRef={inputNumber} 
+                id="guess-number-value" 
+                label="Enter your number" 
+                variant="outlined"
+                fullWidth
+              />
+              <Button 
+                onClick={handleSubmit} 
+                variant="contained"
+                sx={{ minWidth: '140px' }}
+              >
+                Make a guess
+              </Button>
+            </Box>
+          )
         ) : (
           <Box sx={{ width: '100%', textAlign: 'center' }}>
-            <MiniGames onComplete={() => {}} />
+            <MiniGames 
+              onComplete={() => {}} 
+              externalPaused={guessStep !== 'idle' && hasPendingAttempt}
+            />
           </Box>
         )}
       </div>
@@ -467,7 +509,7 @@ export function UnifiedGameInterface() {
 }
 
 export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () => void }) {
-  const { game, getAttempts } = useContext(GameContext);
+  const { game, getAttempts, isGameCompleted } = useContext(GameContext);
 
   const renderAttemptResult = (attempt: Attempt): string => {
     if (!attempt.clue) {
@@ -497,15 +539,17 @@ export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () 
         <div className="game-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
             <h3>Current Game</h3>
-            <Button 
-              onClick={onStartNewGame}
-              variant="outlined"
-              color="error"
-              size="small"
-              className="abandon-game-button"
-            >
-              Abandon & New Game
-            </Button>
+            {(!isGameCompleted || !isGameCompleted()) && (
+              <Button 
+                onClick={onStartNewGame}
+                variant="outlined"
+                color="error"
+                size="small"
+                className="abandon-game-button"
+              >
+                Abandon & New Game
+              </Button>
+            )}
           </div>
           <p className="game-range">
             Guess the number between <span className="highlight-number">{game.min_number}</span> and <span className="highlight-number">{game.max_number}</span>
@@ -527,7 +571,7 @@ export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () 
         </div>
         
         <div className="make-guess-section">
-          <MakeGuess />
+          <MakeGuess onStartNewGame={onStartNewGame} />
         </div>
       </div>
     </Box>

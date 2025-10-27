@@ -12,12 +12,20 @@
     "gen-pah-rpc": "yarn papi add -w wss://testnet-passet-hub.polkadot.io pah",
     "gen-ink-v6-contract-metadata": "yarn papi ink add metadata/guess_the_number.json",
     "generate": "yarn gen-pah-rpc && yarn gen-ink-v6-contract-metadata",
-    "postinstall": "yarn generate"
+    "postinstall": "yarn generate",
+    "find-tx": "node src/scripts/find-tx.mjs",
+    "decode-tx": "node src/scripts/decode-tx.mjs",
+    "decode-contract-event": "node src/scripts/decode-contract-event.mjs",
+    "scan-block": "node src/scripts/scan-blocks.mjs",
+    "scan-range": "node src/scripts/scan-blocks.mjs",
+    "test-block": "node src/scripts/test-block-events.mjs",
+    "test-contract": "node src/scripts/test-contract-query.mjs"
   },
   "peerDependencies": {
     "polkadot-api": "*"
   },
   "dependencies": {
+    "@polkadot/api": "^12.4.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.2",

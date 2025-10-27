@@ -4,6 +4,7 @@ import type { TransactionHistory } from '../types';
 
 export function DebugPanel() {
   const { transactions, clearHistory } = useTransactionHistory();
+  const [eventServiceStatus, setEventServiceStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [isExpanded, setIsExpanded] = useState(false);
   const [filter, setFilter] = useState<'all' | 'guess' | 'start_new_game'>('all');
   const [panelHeight, setPanelHeight] = useState(300); // Hauteur par défaut
@@ -57,6 +58,20 @@ export function DebugPanel() {
     }
   }, [panelHeight, isExpanded]);
 
+  // Surveiller le statut du service d'événements
+  useEffect(() => {
+    const checkEventServiceStatus = () => {
+      // Simuler le statut pour l'instant
+      // Dans une vraie implémentation, on écouterait les événements du service
+      setEventServiceStatus('connected');
+    };
+
+    checkEventServiceStatus();
+    const interval = setInterval(checkEventServiceStatus, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
 
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -105,6 +120,24 @@ export function DebugPanel() {
     }
   };
 
+  const getEventTypeColor = (eventType: string): string => {
+    switch (eventType) {
+      case 'guess_submitted': return '#2196f3';
+      case 'guess_result': return '#4caf50';
+      case 'game_started': return '#ff9800';
+      default: return '#9e9e9e';
+    }
+  };
+
+  const getEventTypeLabel = (eventType: string): string => {
+    switch (eventType) {
+      case 'guess_submitted': return '🎯 Guess Soumis';
+      case 'guess_result': return '📊 Résultat';
+      case 'game_started': return '🎮 Nouveau Jeu';
+      default: return '❓ Événement';
+    }
+  };
+
   const getStatusIcon = (status: TransactionHistory['status']): string => {
     switch (status) {
       case 'pending': return '⏳';
@@ -117,6 +150,29 @@ export function DebugPanel() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+  };
+
+  const safeStringify = (value: any) => {
+    try {
+      return JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? val.toString() : val), 2);
+    } catch (e) {
+      try {
+        // Fallback: shallow clone replacing bigints
+        const replacer = (v: any): any => {
+          if (typeof v === 'bigint') return v.toString();
+          if (Array.isArray(v)) return v.map(replacer);
+          if (v && typeof v === 'object') {
+            const out: any = {};
+            for (const k of Object.keys(v)) out[k] = replacer(v[k]);
+            return out;
+          }
+          return v;
+        };
+        return JSON.stringify(replacer(value), null, 2);
+      } catch {
+        return String(value);
+      }
+    }
   };
 
 
@@ -440,7 +496,7 @@ export function DebugPanel() {
                           overflowY: 'auto'
                         }}>
                           <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                            {JSON.stringify(tx.parameters, null, 2)}
+                            {safeStringify(tx.parameters)}
                           </pre>
                         </div>
                       </div>
@@ -463,6 +519,67 @@ export function DebugPanel() {
                       )}
                     </div>
                   </div>
+
+                  {/* Events Section */}
+                  {tx.events && tx.events.length > 0 && (
+                    <div style={{ 
+                      marginTop: '15px',
+                      borderTop: '1px solid #333',
+                      paddingTop: '10px'
+                    }}>
+                      <div style={{ 
+                        color: '#888', 
+                        fontSize: '10px', 
+                        marginBottom: '8px',
+                        fontWeight: 'bold'
+                      }}>
+                        Événements du jeu ({tx.events.length}):
+                      </div>
+                      {tx.events.map((event, index) => (
+                        <div
+                          key={event.id}
+                          style={{
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            border: '1px solid #444',
+                            borderRadius: '6px',
+                            padding: '8px',
+                            marginBottom: '6px',
+                            fontSize: '11px'
+                          }}
+                        >
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            marginBottom: '4px'
+                          }}>
+                            <span style={{ 
+                              color: getEventTypeColor(event.eventType),
+                              fontWeight: 'bold',
+                              fontSize: '10px'
+                            }}>
+                              {getEventTypeLabel(event.eventType)}
+                            </span>
+                            <span style={{ color: '#888', fontSize: '10px' }}>
+                              {formatTimestamp(event.timestamp)}
+                            </span>
+                          </div>
+                          
+                          <div style={{ 
+                            background: 'rgba(0, 0, 0, 0.3)',
+                            padding: '6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontFamily: 'monospace'
+                          }}>
+                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                              {safeStringify(event.data)}
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -498,6 +615,15 @@ export function DebugPanel() {
             fontSize: '12px'
           }}>
             {transactions.length} transactions
+          </span>
+          <span style={{ 
+            background: eventServiceStatus === 'connected' ? '#4caf50' : eventServiceStatus === 'connecting' ? '#ff9800' : '#f44336',
+            padding: '2px 8px', 
+            borderRadius: '12px',
+            fontSize: '12px',
+            color: 'white'
+          }}>
+            {eventServiceStatus === 'connected' ? '🔗 Events' : eventServiceStatus === 'connecting' ? '⏳ Connecting' : '❌ Disconnected'}
           </span>
           <span style={{ 
             background: '#4caf50', 

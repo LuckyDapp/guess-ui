@@ -7,7 +7,7 @@ interface MiniGamesProps {
 }
 
 export function MiniGames({ onComplete, externalPaused = false }: MiniGamesProps) {
-  const [currentGame, setCurrentGame] = useState<'memory' | 'stars' | null>(null);
+  const [currentGame, setCurrentGame] = useState<'memory' | 'snake' | 'invaders' | null>(null);
   const [score, setScore] = useState(0);
 
   if (currentGame === 'memory') {
@@ -16,6 +16,10 @@ export function MiniGames({ onComplete, externalPaused = false }: MiniGamesProps
 
   if (currentGame === 'snake') {
     return <SnakeGame onComplete={() => setCurrentGame(null)} onScore={(points) => setScore(score + points)} externalPaused={externalPaused} />;
+  }
+
+  if (currentGame === 'invaders') {
+    return <SpaceInvadersGame onComplete={() => setCurrentGame(null)} onScore={(points) => setScore(score + points)} externalPaused={externalPaused} />;
   }
 
   return (
@@ -43,6 +47,16 @@ export function MiniGames({ onComplete, externalPaused = false }: MiniGamesProps
           }}
         >
           🐍 Snake Game
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => setCurrentGame('invaders')}
+          sx={{
+            background: 'linear-gradient(135deg, #7b1fa2, #512da8)',
+            minWidth: '150px'
+          }}
+        >
+          👾 Space Invaders
         </Button>
       </Box>
     </Box>
@@ -175,6 +189,334 @@ function MemoryGame({ onComplete, onScore, externalPaused = false }: { onComplet
       </Box>
       
       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 2 }}>
+        <Button variant="outlined" onClick={resetGame} size="small">
+          New Game
+        </Button>
+        <Button variant="outlined" onClick={onComplete} size="small">
+          Back
+        </Button>
+      </Box>
+    </Box>
+  );
+}
+
+// Space Invaders Game Component
+function SpaceInvadersGame({ onComplete, onScore, externalPaused = false }: { onComplete: () => void; onScore: (points: number) => void; externalPaused?: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [gameActive, setGameActive] = useState(true);
+  const [gameOver, setGameOver] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Player
+  const [playerX, setPlayerX] = useState(200);
+  const playerWidth = 30;
+  const playerHeight = 12;
+  const playerSpeed = 5;
+
+  // Bullets and enemies
+  const [bullets, setBullets] = useState<Array<{ x: number; y: number }>>([]);
+  const [enemies, setEnemies] = useState<Array<{ x: number; y: number; alive: boolean }>>([]);
+  const [enemyDir, setEnemyDir] = useState(1); // 1 -> right, -1 -> left
+  const [enemyStepDown, setEnemyStepDown] = useState(false);
+  const [lastShotTime, setLastShotTime] = useState(0);
+
+  const CANVAS_WIDTH = 400;
+  const CANVAS_HEIGHT = 400;
+
+  // Initialize enemies grid
+  useEffect(() => {
+    const rows = 4;
+    const cols = 8;
+    const spacingX = 40;
+    const spacingY = 30;
+    const offsetX = 30;
+    const offsetY = 40;
+    const initial: Array<{ x: number; y: number; alive: boolean }> = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        initial.push({ x: offsetX + c * spacingX, y: offsetY + r * spacingY, alive: true });
+      }
+    }
+    setEnemies(initial);
+  }, []);
+
+  // Setup canvas size
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+  }, []);
+
+  // Keyboard controls
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (!gameActive) return;
+      if (['ArrowLeft', 'ArrowRight', ' ', 'Control'].includes(e.key)) {
+        e.preventDefault();
+      }
+
+      // Pause/resume on SPACE (same ergonomics as Snake)
+      if (e.key === ' ') {
+        if (gameStarted && !gameOver) {
+          setIsPaused(prev => !prev);
+        }
+        return;
+      }
+
+      // Start on first movement/shoot
+      if (!gameStarted) setGameStarted(true);
+
+      if (e.key === 'ArrowLeft') {
+        setPlayerX(prev => Math.max(0, prev - playerSpeed * 2));
+      } else if (e.key === 'ArrowRight') {
+        setPlayerX(prev => Math.min(CANVAS_WIDTH - playerWidth, prev + playerSpeed * 2));
+      } else if (e.key === 'Control') {
+        // Shoot with cooldown
+        const now = Date.now();
+        if (now - lastShotTime > 200) { // 200ms cooldown between shots
+          setBullets(prev => [...prev, { x: playerX + playerWidth / 2 - 2, y: CANVAS_HEIGHT - 30 }]);
+          setLastShotTime(now);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [gameActive, gameStarted, gameOver, playerX, lastShotTime]);
+
+  // Mouse click toggles pause (same as Snake)
+  useEffect(() => {
+    const handleClick = () => {
+      if (gameStarted && !gameOver) {
+        setIsPaused(prev => !prev);
+      }
+    };
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [gameStarted, gameOver]);
+
+  // Game loop
+  useEffect(() => {
+    if (!gameActive || !gameStarted || isPaused || externalPaused) return;
+
+    const interval = setInterval(() => {
+      // Move enemies horizontally
+      setEnemies(prev => {
+        if (prev.length === 0) return prev;
+        
+        // Check if any enemy would hit the border
+        const aliveEnemies = prev.filter(e => e.alive);
+        if (aliveEnemies.length === 0) return prev;
+        
+        let needReverse = false;
+        const moved = prev.map(e => {
+          if (!e.alive) return e;
+          const nx = e.x + enemyDir * 1.2; // enemy speed (slightly slower)
+          
+          // Check if this enemy would hit the border
+          if (nx <= 5 || nx >= CANVAS_WIDTH - 25) {
+            needReverse = true;
+          }
+          
+          return { ...e, x: nx };
+        });
+        
+        // If we need to reverse, don't move this frame, just change direction
+        if (needReverse) {
+          setEnemyDir(d => -d);
+          setEnemyStepDown(true);
+          return prev; // Don't move this frame
+        }
+        
+        return moved;
+      });
+
+      // Step enemies down after reversing (only once per reverse)
+      if (enemyStepDown) {
+        setEnemies(prev => prev.map(e => ({ ...e, y: e.alive ? e.y + 15 : e.y })));
+        setEnemyStepDown(false);
+      }
+
+      // Move bullets up
+      setBullets(prev => prev
+        .map(b => ({ ...b, y: b.y - 6 }))
+        .filter(b => b.y > -10)
+      );
+
+      // Bullet-enemy collisions
+      setEnemies(prevEnemies => {
+        let gained = 0;
+        const updated = prevEnemies.map(e => {
+          if (!e.alive) return e;
+          for (const b of bullets) {
+            if (b.x >= e.x && b.x <= e.x + 20 && b.y >= e.y && b.y <= e.y + 16) {
+              // hit
+              gained += 5;
+              return { ...e, alive: false };
+            }
+          }
+          return e;
+        });
+        if (gained > 0) {
+          setScore(s => s + gained);
+          onScore(gained);
+          // remove bullets that hit something
+          setBullets(prev => prev.filter(b => !updated.some(e => e.alive === false && b.x >= e.x && b.x <= e.x + 20 && b.y >= e.y && b.y <= e.y + 16)));
+        }
+        return updated;
+      });
+
+      // Check enemy reached bottom or collision with player
+      setEnemies(prev => {
+        const anyAtBottom = prev.some(e => e.alive && e.y > CANVAS_HEIGHT - 70);
+        if (anyAtBottom) {
+          setLives(l => l - 1);
+          // Reset enemies position when they reach bottom
+          const rows = 4;
+          const cols = 8;
+          const spacingX = 40;
+          const spacingY = 30;
+          const offsetX = 30;
+          const offsetY = 40;
+          const reset: Array<{ x: number; y: number; alive: boolean }> = [];
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              reset.push({ x: offsetX + c * spacingX, y: offsetY + r * spacingY, alive: true });
+            }
+          }
+          setEnemyDir(1);
+          setEnemyStepDown(false);
+          return reset;
+        }
+        return prev;
+      });
+
+    }, 16);
+
+    return () => clearInterval(interval);
+  }, [gameActive, gameStarted, isPaused, externalPaused, enemyDir, enemyStepDown, bullets, onScore]);
+
+  // End conditions
+  useEffect(() => {
+    if (lives <= 0) {
+      setGameOver(true);
+      setGameActive(false);
+    }
+  }, [lives]);
+
+  useEffect(() => {
+    if (enemies.length > 0 && enemies.every(e => !e.alive)) {
+      // Win round: respawn with a bit more challenge
+      const rows = 4;
+      const cols = 8;
+      const spacingX = 40;
+      const spacingY = 28;
+      const offsetX = 30;
+      const offsetY = 40;
+      const next: Array<{ x: number; y: number; alive: boolean }> = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          next.push({ x: offsetX + c * spacingX, y: offsetY + r * spacingY, alive: true });
+        }
+      }
+      setEnemies(next);
+      setEnemyDir(d => (d > 0 ? 1 : -1));
+      setEnemyStepDown(false);
+      setLives(l => Math.min(5, l + 1));
+    }
+  }, [enemies]);
+
+  // Draw
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Player
+    ctx.fillStyle = '#64b5f6';
+    const playerY = CANVAS_HEIGHT - 20;
+    ctx.fillRect(playerX, playerY - playerHeight, playerWidth, playerHeight);
+
+    // Enemies
+    enemies.forEach(e => {
+      if (!e.alive) return;
+      ctx.fillStyle = '#ffeb3b';
+      ctx.fillRect(e.x, e.y, 20, 16);
+    });
+
+    // Bullets
+    ctx.fillStyle = '#f44336';
+    bullets.forEach(b => {
+      ctx.fillRect(b.x, b.y, 4, 8);
+    });
+  }, [playerX, enemies, bullets]);
+
+  const resetGame = () => {
+    setScore(0);
+    setLives(3);
+    setBullets([]);
+    setPlayerX(200);
+    setGameOver(false);
+    setGameActive(true);
+    setGameStarted(false);
+    setIsPaused(false);
+    // reset enemies
+    const rows = 4;
+    const cols = 8;
+    const spacingX = 40;
+    const spacingY = 30;
+    const offsetX = 30;
+    const offsetY = 40;
+    const initial: Array<{ x: number; y: number; alive: boolean }> = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        initial.push({ x: offsetX + c * spacingX, y: offsetY + r * spacingY, alive: true });
+      }
+    }
+    setEnemies(initial);
+  };
+
+  return (
+    <Box sx={{ textAlign: 'center', p: 2 }}>
+      <Typography variant="h6" sx={{ color: 'var(--color-primary)', mb: 2 }}>
+        👾 Space Invaders
+      </Typography>
+      <Box sx={{ height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+        <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
+          {!gameStarted ? 'Use ← → to move, press Ctrl to shoot' :
+           isPaused || externalPaused ? '⏸️ PAUSED - Click or press SPACE to resume!' :
+           `Move with ← →, shoot with Ctrl. SPACE/click to pause. Score: ${score} | Lives: ${lives}`}
+        </Typography>
+      </Box>
+
+      {gameOver && (
+        <Typography variant="h5" sx={{ color: 'var(--color-error)', mb: 2 }}>
+          Game Over! Final Score: {score}
+        </Typography>
+      )}
+
+      <Box sx={{ 
+        border: '2px solid var(--color-primary)', 
+        borderRadius: '8px', 
+        display: 'inline-block',
+        mb: 2
+      }}>
+        <canvas
+          ref={canvasRef}
+          style={{
+            display: 'block'
+          }}
+        />
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
         <Button variant="outlined" onClick={resetGame} size="small">
           New Game
         </Button>

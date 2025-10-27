@@ -28,6 +28,7 @@ export type GameContextType = {
   getAttempts: () => Attempt[];
   refreshGuesses: () => void;
   refreshGame: () => void;
+  isGameCompleted: () => boolean;
 };
 
 // UI component props
@@ -73,6 +74,23 @@ export interface ThemeColors {
   textSecondary: string;
 }
 
+// Game event types
+export interface GameEvent {
+  id: string;
+  timestamp: number;
+  blockNumber?: number;
+  eventType: 'guess_submitted' | 'guess_result' | 'game_started';
+  data: {
+    gameNumber?: bigint;
+    attemptNumber?: number;
+    guess?: number;
+    result?: 'More' | 'Less' | 'Found';
+    minNumber?: number;
+    maxNumber?: number;
+  };
+  txHash?: string;
+}
+
 // Transaction history types
 export interface TransactionHistory {
   id: string;
@@ -85,6 +103,7 @@ export interface TransactionHistory {
   error?: string;
   gasUsed?: string;
   fee?: string;
+  events?: GameEvent[]; // Événements associés à cette transaction
 }
 
 // Transaction history context types
@@ -92,6 +111,8 @@ export interface TransactionHistoryContextType {
   transactions: TransactionHistory[];
   addTransaction: (transaction: Omit<TransactionHistory, 'id' | 'timestamp'>) => string;
   updateTransaction: (id: string, updates: Partial<TransactionHistory>) => void;
+  addEventToTransaction: (txId: string, event: Omit<GameEvent, 'id' | 'timestamp'>) => void;
   clearHistory: () => void;
   getTransactionsByCall: (call: string) => TransactionHistory[];
+  getGameEvents: () => GameEvent[];
 }

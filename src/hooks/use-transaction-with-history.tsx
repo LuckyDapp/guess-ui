@@ -5,7 +5,7 @@ import { useChainId, useSigner } from '@reactive-dot/react';
 import type { TransactionHistory } from '../types';
 
 export function useTransactionWithHistory() {
-  const { addTransaction, updateTransaction } = useTransactionHistory();
+  const { addTransaction, updateTransaction, addEventToTransaction } = useTransactionHistory();
   const chainId = useChainId();
   const signer = useSigner();
 
@@ -38,6 +38,13 @@ export function useTransactionWithHistory() {
       onTransactionUpdate: (id: string, updates: Partial<TransactionHistory>) => {
         console.log('Updating transaction:', id, updates);
         updateTransaction(id, updates);
+      },
+      onBlockEvents: (id: string, events: any[]) => {
+        console.log('📦 Block events received for transaction:', id, events);
+        events.forEach(event => {
+          console.log('🎯 Adding event to transaction:', event);
+          addEventToTransaction(id, event);
+        });
       }
     };
 
@@ -85,6 +92,13 @@ export function useTransactionWithHistory() {
       onTransactionUpdate: (id: string, updates: Partial<TransactionHistory>) => {
         console.log('Updating transaction:', id, updates);
         updateTransaction(id, updates);
+      },
+      onBlockEvents: (id: string, events: any[]) => {
+        console.log('📦 Block events received for transaction:', id, events);
+        events.forEach(event => {
+          console.log('🎯 Adding event to transaction:', event);
+          addEventToTransaction(id, event);
+        });
       }
     };
 

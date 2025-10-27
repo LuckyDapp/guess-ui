@@ -144,11 +144,31 @@ export const GameContextProvider = ({ children }: GameContextProviderProps) => {
         if (game == undefined || attempts==undefined){
             return [];
         }
-        return attempts.filter(a => a.gameNumber == game.game_number);
+        return attempts.filter(a => a.gameNumber === game.game_number);
+    };
+
+    const isGameCompleted = () => {
+        try {
+            if (game == undefined || attempts == undefined) {
+                return false;
+            }
+            
+            // Vérifier si le dernier clue est "Found"
+            if (game.last_clue && game.last_clue.type === "Found") {
+                return true;
+            }
+            
+            // Vérifier aussi dans les attempts si il y a un clue "Found"
+            const currentGameAttempts = attempts.filter(a => a.gameNumber === game.game_number);
+            return currentGameAttempts.some(attempt => attempt.clue && attempt.clue.type === "Found");
+        } catch (error) {
+            console.warn("Error in isGameCompleted:", error);
+            return false;
+        }
     };
 
     return (
-        <GameContext.Provider value={{ game, getAttempts, refreshGuesses, refreshGame }} >
+        <GameContext.Provider value={{ game, getAttempts, refreshGuesses, refreshGame, isGameCompleted }} >
             {children}
         </GameContext.Provider>
     );
