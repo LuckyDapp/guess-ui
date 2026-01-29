@@ -56,7 +56,7 @@ export class MyContract {
 
         const client = createClient(withPolkadotSdkCompat(getWsProvider(rpc)))
         const typedApi = client.getTypedApi(pah)
-        const sdk = createReviveSdk(typedApi as any, contracts.guess_the_number)
+        const sdk = createReviveSdk(typedApi as any, contracts.guess_the_number_westend)
         this.contract = sdk.getContract(address)
 
     }

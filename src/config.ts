@@ -4,8 +4,8 @@ import {defineConfig, defineContract} from "@reactive-dot/core";
 import {InjectedWalletProvider} from "@reactive-dot/core/wallets.js";
 import {registerDotConnect} from "dot-connect";
 
-const PAH_RPC = "wss://testnet-passet-hub.polkadot.io";
-const PAH_CONTRACT_ADDRESS = "0xe75cbD47620dBb2053CF2A98D06840f06baAf141";
+const PAH_RPC = "wss://westend-asset-hub-rpc.polkadot.io";
+const PAH_CONTRACT_ADDRESS = "0x6fb458aF1ef0ec5fb31246C592ec69a3f7B00bd0";
 
 // Fallback RPC en cas d'erreur de connexion
 const FALLBACK_RPC = "wss://rpc.polkadot.io";
@@ -29,7 +29,7 @@ export const config = defineConfig({
 registerDotConnect({wallets: config.wallets,})
 
 export const gtnContract = defineContract({
-    descriptor: contracts.guess_the_number,
+    descriptor: contracts.guess_the_number_westend,
 });
 
 export const getContractAddress = (chainId: string): string => {

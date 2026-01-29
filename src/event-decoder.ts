@@ -1,10 +1,11 @@
 import type { GameEvent } from "./types";
 
-// Map des signatures d'événements (premier topic) depuis le metadata
+// Map des signatures d'événements Westend (premier topic) depuis le metadata
 const EVENT_SIGNATURES = {
-    '0xc8a7c5d86cdaf43555273e08a00e4cdaa93cf22046685231d5eb1b6c0d29fa92': 'NewGame',
-    '0xbfe3e4de23c556408a7c400baf6b27364bdb763595ac8f3547c20db70131083a': 'GuessMade',
-    '0xd30c753e3012d98d428abde3eebaae62a09d7d043d8018f1ecb4e6c5d3dc9429': 'ClueGiven'
+    '0xc8a7c5d86cdaf43555273e08a00e4cdaa93cf22046685231d5eb1b6c0d29fa92': 'NewGame', // Westend utilise signature V1
+    '0x3db1630316e0f6c2b1c4274ba861a905acb84d336a2ba821871076503558da72': 'GameOver',
+    '0x6fbbc2beca7d1247dbf89f89623d64c4431ae74cc6ec660f6ce708d846997769': 'ClueGiven',
+    '0xf5b23c2011134ba2467787da32da9ddda148939ab974db7735944b8ea67c3e5d': 'GuessMade'
 } as const;
 
 function decodeU128LittleEndian(bytes: Uint8Array, offset: number): bigint {
@@ -47,7 +48,8 @@ export const decodeContractEvent = (
         
         switch (eventType) {
             case 'NewGame': {
-                // NewGame: game_number (u128), player (H160), min_number (u16), max_number (u16)
+                // Westend NewGame: game_number (u128, indexed), player (H160, indexed), min_number (u16), max_number (u16)
+                // Note: game_number et player sont dans les topics (indexed), donc on les lit depuis eventBytes
                 const gameNumber = decodeU128LittleEndian(eventBytes, offset);
                 offset += 16;
                 
@@ -65,17 +67,20 @@ export const decodeContractEvent = (
                     data: {
                         gameNumber,
                         minNumber,
-                        maxNumber
+                        maxNumber,
+                        player
                     },
                     txHash: undefined
                 };
             }
                 
             case 'GuessMade': {
-                // GuessMade: game_number (u128, indexed), attempt (u32), guess (u16)
-                // game_number est dans topics[1]
+                // V2 GuessMade: game_number (u128, indexed), player (H160, indexed), attempt (u32), guess (u16)
                 const gameNumber = decodeU128LittleEndian(eventBytes, offset);
                 offset += 16;
+                
+                const player = decodeAddress(eventBytes, offset);
+                offset += 20;
                 
                 const attempt = decodeU32LittleEndian(eventBytes, offset);
                 offset += 4;
@@ -88,16 +93,20 @@ export const decodeContractEvent = (
                     data: {
                         gameNumber,
                         attemptNumber: attempt,
-                        guess
+                        guess,
+                        player
                     },
                     txHash: undefined
                 };
             }
                 
             case 'ClueGiven': {
-                // ClueGiven: game_number (u128, indexed), attempt (u32), guess (u16), clue (enum)
+                // V2 ClueGiven: game_number (u128, indexed), player (H160, indexed), attempt (u32), guess (u16), clue (enum)
                 const gameNumber = decodeU128LittleEndian(eventBytes, offset);
                 offset += 16;
+                
+                const player = decodeAddress(eventBytes, offset);
+                offset += 20;
                 
                 const attempt = decodeU32LittleEndian(eventBytes, offset);
                 offset += 4;
@@ -115,7 +124,34 @@ export const decodeContractEvent = (
                         gameNumber,
                         attemptNumber: attempt,
                         guess,
-                        result: clue
+                        result: clue,
+                        player
+                    },
+                    txHash: undefined
+                };
+            }
+            
+            case 'GameOver': {
+                // V2 GameOver: game_number (u128, indexed), player (H160, indexed), win (bool), target (u16)
+                const gameNumber = decodeU128LittleEndian(eventBytes, offset);
+                offset += 16;
+                
+                const player = decodeAddress(eventBytes, offset);
+                offset += 20;
+                
+                const win = eventBytes[offset] !== 0;
+                offset += 1;
+                
+                const target = decodeU16LittleEndian(eventBytes, offset);
+                
+                return {
+                    eventType: 'game_over',
+                    blockNumber: undefined,
+                    data: {
+                        gameNumber,
+                        player,
+                        win,
+                        target
                     },
                     txHash: undefined
                 };

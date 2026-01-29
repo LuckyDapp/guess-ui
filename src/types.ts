@@ -79,7 +79,7 @@ export interface GameEvent {
   id: string;
   timestamp: number;
   blockNumber?: number;
-  eventType: 'guess_submitted' | 'guess_result' | 'game_started';
+  eventType: 'guess_submitted' | 'guess_result' | 'game_started' | 'game_over';
   data: {
     gameNumber?: bigint;
     attemptNumber?: number;
@@ -87,6 +87,10 @@ export interface GameEvent {
     result?: 'More' | 'Less' | 'Found';
     minNumber?: number;
     maxNumber?: number;
+    maxAttempts?: number; // V2: max_attempts dans NewGame
+    player?: string; // V2: player dans GuessMade, ClueGiven, GameOver
+    win?: boolean; // V2: win dans GameOver
+    target?: number; // V2: target dans GameOver
   };
   txHash?: string;
 }

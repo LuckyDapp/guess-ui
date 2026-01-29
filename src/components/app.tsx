@@ -4,6 +4,7 @@ import {ChainProvider, ReactiveDotProvider, SignerProvider, useAccounts} from "@
 import React, {Suspense, useState} from "react";
 import { createPortal } from 'react-dom';
 import {ConnectionButton} from "dot-connect/react.js";
+import {ConnectionButtonAutoClose} from "./connection-button-auto-close.tsx";
 import {BlockchainGame} from "./blockchain-game.tsx";
 
 
@@ -12,6 +13,8 @@ import {Toaster} from "react-hot-toast";
 import {GameContextProvider} from "../contexts/game-context.tsx";
 import {TransactionHistoryProvider} from "../contexts/transaction-history-context.tsx";
 import {AccountSelect} from "./account-select.tsx";
+import {AccountSelectCompact} from "./account-select-compact.tsx";
+import {SelectedAccountProvider} from "../contexts/selected-account-context.tsx";
 import {TransactionProvider} from "./transaction-provider.tsx";
 import {ConnectionStatus, NetworkInfo} from "./connection-status.tsx";
 import {ConnectionStatusCompact} from "./connection-status-compact.tsx";
@@ -111,29 +114,33 @@ export function App() {
                                 )}
                                 onError={(error) => console.error('Blockchain connection error:', error)}
                             >
-                                <AutoAccountSelect>
-                                    {(selectedAccount) => (
-                                        <SignerProvider signer={selectedAccount.polkadotSigner}>
-                                            <TransactionProvider>
-                                                {/* Header avec status de connexion */}
-                                                <HeaderWithConnection />
-                                                
-                                                {/* Contenu principal - Jeu uniquement */}
-                                                <TransactionHistoryProvider>
-                                                    <GameContextProvider>
-                                                        <BlockchainGame/>
-                                                    </GameContextProvider>
-                                                    
-                                                    {/* Debug Panel - toujours actif - rendu dans le conteneur isolé */}
-                                                    {typeof document !== 'undefined' && (() => {
-                                                        const container = document.getElementById('debug-panel-root');
-                                                        return container ? createPortal(<DebugPanel />, container) : null;
-                                                    })()}
-                                                </TransactionHistoryProvider>
-                                            </TransactionProvider>
-                                        </SignerProvider>
-                                    )}
-                                </AutoAccountSelect>
+                                <SelectedAccountProvider>
+                                    <AccountSelect>
+                                        {(selectedAccount) => {
+                                            return (
+                                                <SignerProvider signer={selectedAccount.polkadotSigner}>
+                                                    <TransactionProvider>
+                                                        {/* Header avec status de connexion */}
+                                                        <HeaderWithConnection />
+                                                        
+                                                        {/* Contenu principal - Jeu uniquement */}
+                                                        <TransactionHistoryProvider>
+                                                            <GameContextProvider>
+                                                                <BlockchainGame/>
+                                                            </GameContextProvider>
+                                                            
+                                                            {/* Debug Panel - toujours actif - rendu dans le conteneur isolé */}
+                                                            {typeof document !== 'undefined' && (() => {
+                                                                const container = document.getElementById('debug-panel-root');
+                                                                return container ? createPortal(<DebugPanel />, container) : null;
+                                                            })()}
+                                                        </TransactionHistoryProvider>
+                                                    </TransactionProvider>
+                                                </SignerProvider>
+                                            );
+                                        }}
+                                    </AccountSelect>
+                                </SelectedAccountProvider>
                             </ErrorBoundary>
                         </Suspense>
                     </ChainProvider>
@@ -181,7 +188,7 @@ function Header() {
             alignItems: 'center'
         }}>
             <Suspense fallback={<div>Loading...</div>}>
-                <ConnectionButton />
+                <ConnectionButtonAutoClose />
             </Suspense>
         </Box>
     );
@@ -208,7 +215,10 @@ function HeaderWithConnection() {
                 <ConnectionStatusCompact />
             </Suspense>
             <Suspense fallback={<div>Loading...</div>}>
-                <ConnectionButton />
+                <AccountSelectCompact />
+            </Suspense>
+            <Suspense fallback={<div>Loading...</div>}>
+                <ConnectionButtonAutoClose />
             </Suspense>
         </Box>
     );
@@ -231,3 +241,4 @@ function AutoAccountSelect({ children }: { children: (account: any) => React.Rea
 
     return <>{children(selectedAccount)}</>;
 }
+

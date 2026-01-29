@@ -69,7 +69,7 @@ export const ERROR_MESSAGES = {
 
 // Network constants
 export const NETWORK_CONFIG = {
-  RPC_URL: "wss://testnet-passet-hub.polkadot.io",
-  CONTRACT_ADDRESS: "0xe75cbD47620dBb2053CF2A98D06840f06baAf141",
+  RPC_URL: "wss://westend-asset-hub-rpc.polkadot.io",
+  CONTRACT_ADDRESS: "0x6fb458aF1ef0ec5fb31246C592ec69a3f7B00bd0",
   EXPLORER_URL: "https://polkadot.js.org/apps/",
 } as const;
