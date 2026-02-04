@@ -8,8 +8,50 @@ import {encodeAddress} from "@polkadot/keyring"
 import {toast} from "react-hot-toast"
 import {type Observer} from "rxjs"
 import {getContractAddress, getRpc} from "./config.ts";
-import type { TransactionHistory, GameEvent } from "./types";
+import type { TransactionHistory, GameEvent, Game } from "./types";
 import { processBlockEvents } from "./block-event-processor";
+
+/** Normalize contract response (camelCase or snake_case) to Game type */
+function normalizeGameResponse(raw: any): Game | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const gn = raw.game_number ?? raw.gameNumber;
+    const mn = raw.min_number ?? raw.minNumber;
+    const mx = raw.max_number ?? raw.maxNumber;
+    const att = raw.attempt;
+    const lg = raw.last_guess ?? raw.lastGuess;
+    const lc = raw.last_clue ?? raw.lastClue;
+    const ma = raw.max_attempts ?? raw.maxAttempts;
+    if (gn == null || mn == null || mx == null || att == null) return null;
+    return {
+        game_number: typeof gn === 'bigint' ? gn : BigInt(gn),
+        min_number: Number(mn),
+        max_number: Number(mx),
+        attempt: Number(att),
+        last_guess: lg != null ? Number(lg) : undefined,
+        last_clue: lc != null
+            ? { type: (typeof lc === 'object' ? (lc.type ?? (lc as any)) : lc) as 'More' | 'Less' | 'Found', value: undefined }
+            : undefined,
+        max_attempts: ma != null ? Number(ma) : undefined,
+        cancelled: raw.cancelled
+    };
+}
+
+function isAccountUnmappedError(value: unknown): boolean {
+    const errType = (value as any)?.value?.value?.type ?? (value as any)?.value?.type ?? (value as any)?.type;
+    const errStr = JSON.stringify(value ?? "");
+    return String(errType) === "AccountUnmapped" || errStr.includes("AccountUnmapped");
+}
+
+export type AccountUnmappedDetail = 
+    | { type: "start_new_game"; min: number; max: number }
+    | { type: "guess"; guess: number }
+    | { type: "map_account" };
+
+function emitAccountUnmapped(detail?: AccountUnmappedDetail): void {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("account-unmapped", { detail: detail ?? { type: "map_account" } }));
+    }
+}
 
 // Fonction pour générer l'URL de l'explorer
 function getExplorerUrl(txHash: string, chainId: string): string {
@@ -48,17 +90,48 @@ export function getOrCreateContract(chainId : string) : MyContract {
 export class MyContract {
 
     contract: any
+    private typedApi: any
 
     constructor(
         rpc: string,
         address: string,
     ) {
-
         const client = createClient(withPolkadotSdkCompat(getWsProvider(rpc)))
         const typedApi = client.getTypedApi(pah)
+        this.typedApi = typedApi;
         const sdk = createReviveSdk(typedApi as any, contracts.guess_the_number_westend)
         this.contract = sdk.getContract(address)
+    }
 
+    /** Mappe le compte Substrate dans Revive (pallet Revive.map_account) */
+    async mapAccount(signer: PolkadotSigner, chainId: string): Promise<boolean> {
+        try {
+            const reviveTx = (this.typedApi.tx as any)?.Revive ?? (this.typedApi.tx as any)?.revive;
+            const tx = reviveTx?.map_account?.() ?? reviveTx?.mapAccount?.();
+            if (!tx) {
+                toast.error("Revive.map_account not available on this chain");
+                return false;
+            }
+            return new Promise((resolve) => {
+                const sub = tx.signSubmitAndWatch(signer).subscribe({
+                    next: (e: TxEvent) => {
+                        if (e.type === "finalized") {
+                            toast.success("Account mapped successfully!");
+                            sub.unsubscribe();
+                            resolve(true);
+                        }
+                    },
+                    error: (err: unknown) => {
+                        toast.error("Map account error: " + (err instanceof Error ? err.message : String(err)));
+                        resolve(false);
+                    },
+                    complete: () => resolve(false),
+                });
+            });
+        } catch (err) {
+            toast.error("Map account error: " + (err instanceof Error ? err.message : String(err)));
+            return false;
+        }
     }
 
     async getCurrentGame(sender: PolkadotSigner): Promise<any> {
@@ -77,16 +150,13 @@ export class MyContract {
                 return null;
             }
             
-            // Vérifier que la réponse existe et a la structure attendue
             if (!value || !value.response) {
                 console.warn("No game data found");
                 return null;
             }
-            
-            return value.response;
+            return normalizeGameResponse(value.response);
         } catch (error) {
             // Ignorer les erreurs de SDK (VectorEnc, etc.) qui n'empêchent pas le fonctionnement
-            // console.error("Error in getCurrentGame:", error);
             return null;
         }
     }
@@ -104,13 +174,16 @@ export class MyContract {
             try {
                 const {value, success} = await this.contract.query("guess", tx);
                 if (!success) {
-                    console.error("Error when dry run tx ... ")
-                    console.error(value)
-                    toast.error("Error: " +  value?.value?.value?.type);
+                    if (isAccountUnmappedError(value)) {
+                        emitAccountUnmapped();
+                        return;
+                    }
+                    const errType = value?.value?.value?.type ?? value?.type;
+                    console.error("Error when dry run tx ... ", value);
+                    toast.error("Error: " + errType);
                     return;
                 }
             } catch (e) {
-                // Ignorer les erreurs de SDK (VectorEnc, etc.), continuer quand même
                 console.log("Dry run failed (SDK error), continuing anyway...");
             }
 
@@ -139,13 +212,16 @@ export class MyContract {
             try {
                 const {value, success} = await this.contract.query("start_new_game", tx,)
                 if (!success) {
-                    console.error("Error when dry run tx ... ")
-                    console.error(value)
-                    toast.error("Error: " +  value?.value?.value?.type);
+                    if (isAccountUnmappedError(value)) {
+                        emitAccountUnmapped();
+                        return;
+                    }
+                    const errType = value?.value?.value?.type ?? value?.type;
+                    console.error("Error when dry run tx ... ", value);
+                    toast.error("Error: " + errType);
                     return;
                 }
             } catch (e) {
-                // Ignorer les erreurs de SDK (VectorEnc, etc.), continuer quand même
                 console.log("Dry run failed (SDK error), continuing anyway...");
             }
 
@@ -180,13 +256,16 @@ export class MyContract {
             try {
                 const {value, success} = await this.contract.query("guess", tx);
                 if (!success) {
-                    console.error("Error when dry run tx ... ")
-                    console.error(value)
-                    toast.error("Error: " +  value?.value?.value?.type);
+                    if (isAccountUnmappedError(value)) {
+                        emitAccountUnmapped({ type: "guess", guess });
+                        return null;
+                    }
+                    const errType = value?.value?.value?.type ?? value?.type;
+                    console.error("Error when dry run tx ... ", value);
+                    toast.error("Error: " + errType);
                     return null;
                 }
             } catch (e) {
-                // Ignorer les erreurs de SDK (VectorEnc, etc.), continuer quand même
                 console.log("Dry run failed (SDK error), continuing anyway...");
             }
 
@@ -227,13 +306,16 @@ export class MyContract {
             try {
                 const {value, success} = await this.contract.query("start_new_game", tx)
                 if (!success) {
-                    console.error("Error when dry run tx ... ")
-                    console.error(value)
-                    toast.error("Error: " +  value?.value?.value?.type);
+                    if (isAccountUnmappedError(value)) {
+                        emitAccountUnmapped({ type: "start_new_game", min: minNumber, max: maxNumber });
+                        return null;
+                    }
+                    const errType = value?.value?.value?.type ?? value?.type;
+                    console.error("Error when dry run tx ... ", value);
+                    toast.error("Error: " + errType);
                     return null;
                 }
             } catch (e) {
-                // Ignorer les erreurs de SDK (VectorEnc, etc.), continuer quand même
                 console.log("Dry run failed (SDK error), continuing anyway...");
             }
 
@@ -289,9 +371,13 @@ function buildEventObserver(toastId: string,  successMessage: string, callback: 
             toast.loading(toastValue, {id: toastId});
         },
         error: (message) => {
-            console.error(message)
+            console.error(message);
             toast.dismiss(toastId);
-            toast.error(message);
+            if (String(message).includes("AccountUnmapped")) {
+                emitAccountUnmapped();
+            } else {
+                toast.error(message);
+            }
         },
         complete: () => {
             toast.dismiss(toastId);
@@ -308,6 +394,15 @@ function buildEventObserverWithHistory(
     txId: string,
     chainId: string
 ): Partial<Observer<TxEvent>> {
+    let successCalled = false;
+    const callOnSuccess = () => {
+        if (!successCalled) {
+            successCalled = true;
+            toast.dismiss(toastId);
+            toast.success(successMessage, { duration: 5000 });
+            callback.onSuccess();
+        }
+    };
     return {
         next: (event) => {
             let message = 'Tx event:' + event.type;
@@ -397,6 +492,9 @@ function buildEventObserverWithHistory(
                     console.warn('⚠️ No events found in finalized transaction');
                     console.log('📊 Available properties:', Object.keys(event));
                 }
+
+                callOnSuccess();
+                return;
             }
             
             const explorerUrl = getExplorerUrl(event?.txHash || '', chainId);
@@ -414,13 +512,15 @@ function buildEventObserverWithHistory(
                 error: error.toString() 
             });
             toast.dismiss(toastId);
-            toast.error(error.toString());
+            if (String(error).includes("AccountUnmapped")) {
+                emitAccountUnmapped();
+            } else {
+                toast.error(error.toString());
+            }
         },
         complete: () => {
             console.log('Transaction completed for ID:', txId);
-            toast.dismiss(toastId);
-            toast.success(successMessage, { duration: 5000 });
-            callback.onSuccess();
+            callOnSuccess();
         }
     };
 }

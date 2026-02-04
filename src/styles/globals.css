@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&family=Rum+Raisin&display=swap');
 @import './variables.css';
 @import './animations.css';
 @import './components.css';
@@ -265,21 +265,62 @@ body::before {
   box-shadow: none !important;
 }
 
+/* Styles simplifiés pour les TextField Material-UI - évite la double bordure */
 [class*="MuiTextField-root"] .MuiOutlinedInput-root {
   border-radius: var(--radius-lg) !important;
-  transition: all var(--transition-normal) !important;
+  transition: border-color 0.2s ease !important;
   background: rgba(255, 255, 255, 0.1) !important;
   color: var(--text-primary) !important;
 }
 
+/* TextFields dans les modales : fond opaque pour lisibilité */
+.MuiDialog-root [class*="MuiTextField-root"] .MuiOutlinedInput-root,
+.MuiModal-root [class*="MuiTextField-root"] .MuiOutlinedInput-root {
+  background: #2d2d2d !important;
+}
+
+/* Labels flottants dans les modales : fond opaque pour éviter le masquage */
+.MuiDialog-root [class*="MuiTextField-root"] .MuiInputLabel-root.MuiInputLabel-shrink,
+.MuiModal-root [class*="MuiTextField-root"] .MuiInputLabel-root.MuiInputLabel-shrink {
+  background-color: #2d2d2d !important;
+  padding: 0 4px !important;
+  z-index: 1 !important;
+}
+
+
+[class*="MuiTextField-root"] .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  border-width: 1px !important;
+}
+
 [class*="MuiTextField-root"] .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-  border-color: var(--border-focus) !important;
+  border-color: rgba(212, 175, 55, 0.6) !important;
+  border-width: 1px !important;
 }
 
 [class*="MuiTextField-root"] .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
   border-color: var(--color-primary) !important;
-  border-width: 2px !important;
-  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5) !important;
+  border-width: 1px !important;
+}
+
+[class*="MuiTextField-root"] .MuiOutlinedInput-root.Mui-focused {
+  box-shadow: none !important;
+}
+
+/* Toast - fixé en haut à droite, marge sous le header */
+[data-rht-toaster] {
+  position: fixed !important;
+  top: var(--toast-top-offset) !important;
+  right: 16px !important;
+  left: auto !important;
+  bottom: auto !important;
+  padding: 0 !important;
+  z-index: 99999 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+[data-rht-toaster] > * {
+  pointer-events: auto !important;
 }
 
 /* Scrollbar */
@@ -311,8 +352,7 @@ body::before {
 
 /* Ensure main content can scroll properly */
 .main-content {
-  min-height: calc(100vh - 80px); /* Subtract header height */
-  /* padding-bottom fixe pour le scroll */
+  min-height: calc(100vh - 48px); /* Header compact */
   overflow: visible;
 }
 

@@ -99,7 +99,7 @@ export function DebugPanel() {
   });
 
   const formatTimestamp = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleString('fr-FR', {
+    return new Date(timestamp).toLocaleString('en-US', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -125,16 +125,22 @@ export function DebugPanel() {
       case 'guess_submitted': return '#2196f3';
       case 'guess_result': return '#4caf50';
       case 'game_started': return '#ff9800';
+      case 'game_over': return '#9c27b0';
+      case 'game_cancelled': return '#f44336';
+      case 'max_attempts_updated': return '#00bcd4';
       default: return '#9e9e9e';
     }
   };
 
   const getEventTypeLabel = (eventType: string): string => {
     switch (eventType) {
-      case 'guess_submitted': return '🎯 Guess Soumis';
-      case 'guess_result': return '📊 Résultat';
-      case 'game_started': return '🎮 Nouveau Jeu';
-      default: return '❓ Événement';
+      case 'guess_submitted': return '🎯 Guess Submitted';
+      case 'guess_result': return '📊 Result';
+      case 'game_started': return '🎮 New Game';
+      case 'game_over': return '🏁 Game Over';
+      case 'game_cancelled': return '🚫 Game Cancelled';
+      case 'max_attempts_updated': return '📈 Max Attempts Updated';
+      default: return '❓ Event';
     }
   };
 
@@ -261,9 +267,9 @@ export function DebugPanel() {
                 fontSize: '12px'
               }}
             >
-              <option value="all">Toutes les transactions</option>
-              <option value="guess">Deviner un nombre</option>
-              <option value="start_new_game">Nouveau jeu</option>
+              <option value="all">All transactions</option>
+              <option value="guess">Guess a number</option>
+              <option value="start_new_game">New game</option>
             </select>
             
             <button
@@ -278,7 +284,7 @@ export function DebugPanel() {
                 cursor: 'pointer'
               }}
             >
-              🗑️ Effacer l'historique
+              🗑️ Clear history
             </button>
             
             <button
@@ -335,7 +341,7 @@ export function DebugPanel() {
                 padding: '20px',
                 fontSize: '14px'
               }}>
-                Aucune transaction trouvée
+                No transactions found
               </div>
             ) : (
               filteredTransactions.map((tx) => (
@@ -388,10 +394,10 @@ export function DebugPanel() {
                       {tx.txHash && (
                         <div style={{ marginBottom: '8px' }}>
                           <div style={{ color: '#888', fontSize: '10px', marginBottom: '2px' }}>
-                            Hash de transaction:
+                            Transaction hash:
                             {tx.txHash.startsWith('0x5102') && (
                               <span style={{ color: '#4caf50', marginLeft: '8px' }}>
-                                ✓ Format signé (0x5102...)
+                                ✓ Signed format (0x5102...)
                               </span>
                             )}
                           </div>
@@ -412,7 +418,7 @@ export function DebugPanel() {
                                  >
                                    <span
                                      onClick={() => copyToClipboard(tx.txHash!)}
-                                     title="Cliquer pour copier"
+                                     title="Click to copy"
                                    >
                                      {tx.txHash}
                                    </span>
@@ -423,7 +429,7 @@ export function DebugPanel() {
                       {tx.blockNumber && (
                         <div style={{ marginBottom: '8px' }}>
                           <div style={{ color: '#888', fontSize: '10px', marginBottom: '2px' }}>
-                            Numéro de bloc:
+                            Block number:
                           </div>
                           <div style={{ 
                             color: 'white', 
@@ -446,7 +452,7 @@ export function DebugPanel() {
                                 borderRadius: '4px',
                                 border: '1px solid rgba(255, 152, 0, 0.3)'
                               }}
-                              title="Voir le bloc dans Polkadot.js (Passet-Hub)"
+                              title="View block in Polkadot.js (Passet-Hub)"
                             >
                               🔗 Block
                             </a>
@@ -459,7 +465,7 @@ export function DebugPanel() {
                           {tx.gasUsed && (
                             <div style={{ marginBottom: '4px' }}>
                               <div style={{ color: '#888', fontSize: '10px', marginBottom: '2px' }}>
-                                Gas utilisé:
+                                Gas used:
                               </div>
                               <div style={{ color: 'white', fontSize: '11px' }}>
                                 {tx.gasUsed}
@@ -469,7 +475,7 @@ export function DebugPanel() {
                           {tx.fee && (
                             <div>
                               <div style={{ color: '#888', fontSize: '10px', marginBottom: '2px' }}>
-                                Frais:
+                                Fees:
                               </div>
                               <div style={{ color: 'white', fontSize: '11px' }}>
                                 {tx.fee}
@@ -484,7 +490,7 @@ export function DebugPanel() {
                     <div>
                       <div style={{ marginBottom: '8px' }}>
                         <div style={{ color: '#888', fontSize: '10px', marginBottom: '2px' }}>
-                          Paramètres:
+                          Parameters:
                         </div>
                         <div style={{ 
                           background: 'rgba(0, 0, 0, 0.3)',
@@ -504,7 +510,7 @@ export function DebugPanel() {
                       {tx.error && (
                         <div>
                           <div style={{ color: '#f44336', fontSize: '10px', marginBottom: '2px' }}>
-                            Erreur:
+                            Error:
                           </div>
                           <div style={{ 
                             color: '#f44336', 
@@ -533,7 +539,7 @@ export function DebugPanel() {
                         marginBottom: '8px',
                         fontWeight: 'bold'
                       }}>
-                        Événements du jeu ({tx.events.length}):
+                        Game events ({tx.events.length}):
                       </div>
                       {tx.events.map((event, index) => (
                         <div

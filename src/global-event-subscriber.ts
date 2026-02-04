@@ -6,6 +6,15 @@ import { decodeContractEvent } from "./event-decoder";
 import type { GameEvent } from "./types";
 import { getContractAddress, getRpc } from "./config";
 
+// Système de log conditionnel (seulement en développement)
+const isDev = process.env.NODE_ENV === 'development' || (typeof window !== 'undefined' && window.location.hostname === 'localhost');
+const debugLog = (...args: any[]) => {
+    if (isDev) console.log(...args);
+};
+const debugWarn = (...args: any[]) => {
+    if (isDev) console.warn(...args);
+};
+
 type Unsubscribe = () => void;
 
 export function setupGlobalEventSubscription(
@@ -19,14 +28,14 @@ export function setupGlobalEventSubscription(
       return null;
     }
 
-    console.log("🔗 GlobalEventSub: connecting", { rpc, contractAddress });
+    debugLog("🔗 GlobalEventSub: connecting", { rpc, contractAddress });
     const client = createClient(withPolkadotSdkCompat(getWsProvider(rpc)));
     const typedApi: any = client.getTypedApi(pah);
 
     // Subscribe to System.Events using typed API (capitalized pallet names)
     const storage = (typedApi as any)?.query?.System?.Events;
     if (!storage) {
-      console.warn("GlobalEventSub: typedApi.query.System.Events not available");
+      debugWarn("GlobalEventSub: typedApi.query.System.Events not available");
       client.destroy();
       return null;
     }
@@ -40,14 +49,21 @@ export function setupGlobalEventSubscription(
           ? events
           : (Array.isArray((events as any)?.value) ? (events as any).value : []);
         if (!Array.isArray(records) || records.length === 0) return;
-        console.log("GlobalEventSub: received", records.length, "events");
-        // events are in modern format: { type: "Pallet", value: {...}, topics: [] }
-        records.forEach((record: any) => {
+        
+        // Filtrer d'abord les événements Revive avant de les traiter
+        const reviveEvents = records.filter((record: any) => {
           const palletName = record?.type;
           const eventValue = record?.value;
-          if (palletName !== "Revive") return;
-          if (eventValue?.type !== "ContractEmitted") return;
-
+          return palletName === "Revive" && eventValue?.type === "ContractEmitted";
+        });
+        
+        if (reviveEvents.length === 0) return;
+        
+        debugLog("GlobalEventSub: received", reviveEvents.length, "Revive events");
+        
+        // Traiter uniquement les événements Revive filtrés
+        reviveEvents.forEach((record: any) => {
+          const eventValue = record?.value;
           const contractData = eventValue.value;
           const addrHex = contractData?.contract?.asHex?.();
           if (!addrHex) return;
@@ -61,23 +77,23 @@ export function setupGlobalEventSubscription(
 
           const decoded = decodeContractEvent(dataBytes, topicsBytes);
           if (decoded) {
-            console.log("🧩 GlobalEventSub decoded:", decoded);
+            debugLog("🧩 GlobalEventSub decoded:", decoded);
           }
         });
       } catch (e) {
-        console.warn("GlobalEventSub: error while handling events", e);
+        debugWarn("GlobalEventSub: error while handling events", e);
       }
     };
 
     if (typeof storage?.subscribe === "function") {
-      console.log("GlobalEventSub: subscribing via storage.subscribe");
+      debugLog("GlobalEventSub: subscribing via storage.subscribe");
       unsub = storage.subscribe(handleEvents) as Unsubscribe;
     } else if (storage?.value$?.subscribe) {
-      console.log("GlobalEventSub: subscribing via storage.value$.subscribe");
+      debugLog("GlobalEventSub: subscribing via storage.value$.subscribe");
       const sub = storage.value$.subscribe({ next: handleEvents });
       unsub = () => sub.unsubscribe();
     } else {
-      console.warn("GlobalEventSub: no known subscribe interface for system.events");
+      debugWarn("GlobalEventSub: no known subscribe interface for system.events");
       client.destroy();
       return null;
     }
@@ -104,27 +120,24 @@ export function setupFinalizedBlocksWatcher(
       return null;
     }
 
-    console.log("🔭 BlockWatcher: connecting", { rpc, contractAddress });
+    debugLog("🔭 BlockWatcher: connecting", { rpc, contractAddress });
     const client = createClient(withPolkadotSdkCompat(getWsProvider(rpc)));
     const typedApi: any = client.getTypedApi(pah);
 
     // S'abonner aux blocs finalisés et récupérer les événements de chaque bloc
-    console.log("🔭 BlockWatcher: setting up finalized blocks subscription");
+    debugLog("🔭 BlockWatcher: setting up finalized blocks subscription");
     
     const subscription = client.finalizedBlock$.subscribe(async (finalizedBlock) => {
       try {
-        console.log('🔭 BlockWatcher: new finalized block', finalizedBlock.number, finalizedBlock.hash);
-        console.log('🔍 BlockWatcher: finalizedBlock keys:', Object.keys(finalizedBlock));
+        debugLog('🔭 BlockWatcher: new finalized block', finalizedBlock.number);
 
         // Essayer d'abord de récupérer les événements depuis le bloc lui-même
         let events: any[] | null = null;
         
         // Vérifier si les événements sont déjà dans finalizedBlock
         if ((finalizedBlock as any).events) {
-          console.log('✅ BlockWatcher: Using events from finalizedBlock object');
           events = (finalizedBlock as any).events;
         } else {
-          console.log('🔍 BlockWatcher: Fetching events via query API');
           // Récupérer les événements du bloc spécifique avec { at: blockHash }
           events = await typedApi.query.System.Events.getValue({
             at: finalizedBlock.hash
@@ -132,50 +145,40 @@ export function setupFinalizedBlocksWatcher(
         }
         
         if (!Array.isArray(events)) {
-          console.warn('⚠️ BlockWatcher: events is not an array, type:', typeof events);
+          debugWarn('⚠️ BlockWatcher: events is not an array');
           return;
         }
 
-        console.log(`📦 BlockWatcher: processing ${events.length} events from block ${finalizedBlock.number}`);
-        
-        // Afficher tous les types d'événements pour debug
-        const eventTypes = events.map((r: any) => r?.event?.type || r?.type).filter(Boolean);
-        const uniqueTypes = [...new Set(eventTypes)];
-        if (uniqueTypes.length > 0) {
-          console.log(`📋 BlockWatcher: event types in block ${finalizedBlock.number}:`, uniqueTypes.join(', '));
-        }
-        
-        // Filtrer et décoder les événements du contrat
-        let contractEventCount = 0;
-        events.forEach((record: any) => {
-          // Structure: { phase, event, topics }
+        // Filtrer d'abord les événements Revive avant de les traiter
+        const reviveContractEvents = events.filter((record: any) => {
           const event = record?.event;
-          if (!event) return;
+          if (!event) return false;
           
           const palletName = event?.type;
           const eventValue = event?.value;
           
-          if (palletName !== 'Revive') return;
+          if (palletName !== 'Revive' || eventValue?.type !== 'ContractEmitted') return false;
           
-          console.log(`🔍 BlockWatcher: Found Revive event! Type:`, eventValue?.type);
-          
-          if (eventValue?.type !== 'ContractEmitted') return;
-
           const contractData = eventValue.value;
           const addrHex = contractData?.contract?.asHex?.();
           
-          if (!addrHex || addrHex.toLowerCase() !== contractAddress.toLowerCase()) {
-            return;
-          }
-
-          contractEventCount++;
-          console.log(`🎯 BlockWatcher: ContractEmitted #${contractEventCount} from our contract in block ${finalizedBlock.number}`);
+          return addrHex && addrHex.toLowerCase() === contractAddress.toLowerCase();
+        });
+        
+        if (reviveContractEvents.length === 0) return;
+        
+        debugLog(`📦 BlockWatcher: processing ${reviveContractEvents.length} contract events from block ${finalizedBlock.number}`);
+        
+        // Traiter uniquement les événements filtrés
+        reviveContractEvents.forEach((record: any) => {
+          const eventValue = record?.event?.value;
+          const contractData = eventValue.value;
 
           const dataBytes: Uint8Array | undefined = contractData?.data?.asBytes?.();
           const topicsBytes: Uint8Array[] | undefined = contractData?.topics?.map((t: any) => t?.asBytes?.());
           
           if (!dataBytes || !topicsBytes) {
-            console.warn('⚠️ BlockWatcher: Missing dataBytes or topicsBytes');
+            debugWarn('⚠️ BlockWatcher: Missing dataBytes or topicsBytes');
             return;
           }
 
@@ -186,26 +189,20 @@ export function setupFinalizedBlocksWatcher(
               ...decoded,
               blockNumber: finalizedBlock.number
             };
-            console.log('🧩 BlockWatcher decoded event:', eventWithBlock);
+            debugLog('🧩 BlockWatcher decoded event');
             try { 
               onDecoded && onDecoded(eventWithBlock); 
             } catch (e) {
-              console.warn('⚠️ BlockWatcher: Error calling onDecoded callback:', e);
+              debugWarn('⚠️ BlockWatcher: Error calling onDecoded callback:', e);
             }
-          } else {
-            console.warn('⚠️ BlockWatcher: Failed to decode event');
           }
         });
-
-        if (contractEventCount > 0) {
-          console.log(`✅ BlockWatcher: Found ${contractEventCount} contract events in block ${finalizedBlock.number}`);
-        }
       } catch (e) {
-        console.warn('BlockWatcher: error processing block', e);
+        debugWarn('BlockWatcher: error processing block', e);
       }
     });
 
-    console.log('✅ BlockWatcher: Watcher active');
+    debugLog('✅ BlockWatcher: Watcher active');
 
     return () => {
       try { subscription.unsubscribe(); } catch {}

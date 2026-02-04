@@ -224,15 +224,14 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: calc(var(--spacing-md) + 40px) var(--spacing-md) var(--spacing-md) var(--spacing-md);
+  padding: var(--spacing-md);
   box-shadow: none;
   text-align: center;
   width: 100%;
   max-width: 700px;
-  margin: var(--spacing-xs) auto;
-  transform: translateY(30px);
+  margin: 0 auto;
   opacity: 0;
-  animation: slideUp 0.8s ease-out 1.5s forwards;
+  animation: slideUp 0.6s ease-out 0.3s forwards;
 }
 
 .game-container h2 {
@@ -520,24 +519,16 @@
   text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
 }
 
-.new-game-inputs input {
-  padding: var(--spacing-sm);
-  border: 2px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  font-size: 1rem;
-  text-align: center;
+/* Ne pas appliquer de bordure/box-shadow aux inputs dans les TextField MUI
+   (évite le double contour et le trait qui barre le label) */
+.new-game-inputs .MuiTextField-root input {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
-
-.new-game-inputs input:focus {
-  outline: none;
-  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-}
-
-.new-game-inputs input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.new-game-inputs .MuiTextField-root input:focus {
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* Advanced cube styles */

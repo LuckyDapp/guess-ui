@@ -10,20 +10,43 @@ type AccountSelectProps = {
 export function AccountSelect({ children }: AccountSelectProps) {
     const connectedWallets = useConnectedWallets();
     const accounts = useAccounts();
-    const { selectedAccount, setSelectedAccount } = useSelectedAccount();
+    const { selectedAccount, setSelectedAccount, getStoredAccount, storeAccount } = useSelectedAccount();
 
-    // Initialiser avec le premier compte si aucun n'est sélectionné
+    // Charger le compte sauvegardé ou initialiser avec le premier compte
     useEffect(() => {
-        if (accounts.length > 0 && !selectedAccount) {
-            setSelectedAccount(accounts[0]);
+        if (accounts.length === 0) return;
+        
+        const stored = getStoredAccount();
+        if (stored && stored.type === 'wallet') {
+            // Chercher le compte sauvegardé par adresse
+            const savedAccount = accounts.find(acc => acc.address === stored.identifier);
+            if (savedAccount) {
+                setSelectedAccount(savedAccount);
+                return;
+            }
         }
-    }, [accounts, selectedAccount, setSelectedAccount]);
+        
+        // Si aucun compte sauvegardé trouvé, utiliser le premier compte
+        if (!selectedAccount) {
+            setSelectedAccount(accounts[0]);
+            if (accounts[0]) {
+                storeAccount('wallet', accounts[0].address);
+            }
+        }
+    }, [accounts, selectedAccount, setSelectedAccount, getStoredAccount, storeAccount]);
+
+    // Sauvegarder quand le compte change
+    useEffect(() => {
+        if (selectedAccount) {
+            storeAccount('wallet', selectedAccount.address);
+        }
+    }, [selectedAccount, storeAccount]);
 
     // Si aucun wallet n'est connecté, afficher un message
     if (connectedWallets.length === 0) {
         return (
             <div style={{ textAlign: 'center', padding: '20px', color: '#b0b0b0' }}>
-                <p>🔌 Veuillez connecter un wallet pour continuer</p>
+                <p>🔌 Please connect a wallet to continue</p>
             </div>
         );
     }
@@ -32,7 +55,7 @@ export function AccountSelect({ children }: AccountSelectProps) {
     if (!selectedAccount) {
         return (
             <div style={{ textAlign: 'center', padding: '20px', color: '#b0b0b0' }}>
-                <p>⏳ Chargement des comptes...</p>
+                <p>⏳ Loading accounts...</p>
             </div>
         );
     }

@@ -1,14 +1,23 @@
-import { Suspense, useContext, useRef, useState, useEffect } from "react";
-import { Box, Button, TextField, Typography } from "@mui/material";
+import { Suspense, useContext, useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { Box, Button, TextField, Typography, Chip } from "@mui/material";
 import { GameContext } from "../contexts/game-context.tsx";
 import { toast } from "react-hot-toast";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { isPositiveNumber } from "../utils/number-utils.ts";
-import type { Attempt, ClueType } from "../types.ts";
-import { ERROR_MESSAGES, TOAST_MESSAGES, UI_CONFIG } from "../constants";
-import { MiniGames } from "./mini-games.tsx";
+import type { Attempt, ClueType, Clue } from "../types.ts";
+import { ERROR_MESSAGES, TOAST_MESSAGES, UI_CONFIG } from "../config";
 import { useTransactionWithHistory } from "../hooks/use-transaction-with-history";
+import type { AccountUnmappedDetail } from "../contract";
 import { useQueryErrorResetter } from "@reactive-dot/react";
+import { fetchMaxMaxAttempts, type IndexerGame, type GuessHistoryItem } from "../services/token-indexer";
+
+/** Style commun pour tous les TextField (même rendu fluide que guess-number-value) */
+const textFieldSx = {
+  '& .MuiOutlinedInput-root': {
+    '& fieldset': { borderWidth: '1px' },
+    '&.Mui-focused fieldset': { borderWidth: '1px' },
+  },
+};
 
 // Loading animation component
 function GameCreationLoader({ step }: { step: 'submitting' | 'finalizing' | 'syncing' }) {
@@ -86,7 +95,7 @@ function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' |
           {step === 'finalizing' ? '• Waiting for finalization' : '○ Waiting for finalization'}
         </Typography>
         <Typography variant="body2" sx={{ color: step === 'syncing' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'syncing' ? 700 : 500 }}>
-          {step === 'syncing' ? '• Syncing attempts' : '○ Syncing attempts'}
+          {step === 'syncing' ? '• Waiting for guess results' : '○ Waiting for guess results'}
         </Typography>
         <Typography variant="body2" sx={{ color: step === 'received' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'received' ? 700 : 500 }}>
           {step === 'received' ? '• Guess received and processed' : '○ Guess received and processed'}
@@ -97,12 +106,11 @@ function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' |
 }
 
 export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () => void }) {
-  const { refreshGuesses, getAttempts, isGameCompleted } = useContext(GameContext);
+  const { game, refreshGuesses, getAttempts, isGameCompleted } = useContext(GameContext);
   const { makeGuessWithHistory } = useTransactionWithHistory();
   const inputNumber = useRef<HTMLInputElement>(null);
   const [hasPendingAttempt, setHasPendingAttempt] = useState(false);
   const [guessStep, setGuessStep] = useState<'submitting' | 'finalizing' | 'syncing' | 'received' | 'idle'>('idle');
-  const [showMiniGames, setShowMiniGames] = useState(false);
 
   // Check for pending attempts
   useEffect(() => {
@@ -113,11 +121,7 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
         setHasPendingAttempt(hasPending);
         if (!hasPending && guessStep === 'syncing') {
           setGuessStep('received');
-          // Attendre un peu avant de passer à idle pour laisser le temps à l'utilisateur de voir le statut "received"
-          setTimeout(() => {
-            setGuessStep('idle');
-            setShowMiniGames(false);
-          }, 2000);
+          setTimeout(() => setGuessStep('idle'), 2000);
         }
       } catch (error) {
         console.warn('Error checking pending attempts:', error);
@@ -143,13 +147,15 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
       return;
     }
 
-    // Vérifier si le jeu est terminé
     if (isGameCompleted && isGameCompleted()) {
       toast.error("🎉 Congratulations! You found the number! The game is complete.");
       return;
     }
+    if (game && game.max_attempts != null && game.attempt >= game.max_attempts) {
+      toast.error("No attempts left. Start a new game to continue.");
+      return;
+    }
 
-    console.log("Guess:", guessNumber);
     setGuessStep('submitting');
     
     const txId = await makeGuessWithHistory(parseInt(guessNumber), () => {
@@ -160,15 +166,13 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
 
     if (txId) {
       setGuessStep('finalizing');
-      // Afficher les mini-jeux pendant l'attente
-      setShowMiniGames(true);
     } else {
       setGuessStep('idle');
     }
   };
 
   return (
-    <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+    <Box sx={{ padding: "16px 24px 0 24px" }} display="flex" justifyContent="center">
       <div className="content-block fade-in" style={{
         display: 'flex',
         flexDirection: 'column',
@@ -221,6 +225,7 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
                   label="Enter your number" 
                   variant="outlined"
                   fullWidth
+                  sx={textFieldSx}
                 />
                 <Button 
                   onClick={handleSubmit} 
@@ -230,84 +235,9 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
                   Make a guess
                 </Button>
               </Box>
-            
-              {/* Bouton pour reprendre les mini-jeux */}
-              {showMiniGames && (
-                <Box sx={{ textAlign: 'center', mt: 2 }}>
-                  <Button 
-                    onClick={() => setShowMiniGames(true)}
-                    variant="outlined"
-                    sx={{ 
-                      borderColor: 'var(--color-primary)',
-                      color: 'var(--color-primary)',
-                      '&:hover': {
-                        borderColor: 'var(--color-primary)',
-                        backgroundColor: 'rgba(100, 181, 246, 0.1)'
-                      }
-                    }}
-                  >
-                    🎮 Reprendre les mini-jeux
-                  </Button>
-                </Box>
-              )}
             </Box>
           )
-        ) : (
-          <Box sx={{ width: '100%', textAlign: 'center' }}>
-            <MiniGames 
-              onComplete={() => {}} 
-              externalPaused={guessStep !== 'idle' && hasPendingAttempt}
-            />
-          </Box>
-        )}
-        
-        {/* Mini-jeux en mode pause/overlay - seulement quand showMiniGames est true ET qu'on n'est pas en attente */}
-        {showMiniGames && (!hasPendingAttempt && guessStep === 'idle') && (
-          <Box sx={{ 
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px'
-          }}>
-            <Box sx={{ 
-              backgroundColor: 'var(--background)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '20px',
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              position: 'relative'
-            }}>
-              <Button
-                onClick={() => setShowMiniGames(false)}
-                sx={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  minWidth: 'auto',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(244, 67, 54, 0.1)',
-                  color: '#f44336',
-                  '&:hover': {
-                    backgroundColor: 'rgba(244, 67, 54, 0.2)'
-                  }
-                }}
-              >
-                ✕
-              </Button>
-              <MiniGames onComplete={() => setShowMiniGames(false)} />
-            </Box>
-          </Box>
-        )}
+        ) : null}
       </div>
     </Box>
   );
@@ -319,6 +249,28 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
   const refMin = useRef<HTMLInputElement>(null);
   const refMax = useRef<HTMLInputElement>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  const doStartNewGame = useCallback(async (minNumber: number, maxNumber: number) => {
+    setIsCreating(true);
+    const txId = await startNewGameWithHistory(minNumber, maxNumber, () => {
+      refreshGame();
+      setIsCreating(false);
+      onGameCreated?.();
+      toast.success(TOAST_MESSAGES.TRANSACTION_SUCCESS);
+    });
+    if (!txId) setIsCreating(false);
+  }, [startNewGameWithHistory, refreshGame, onGameCreated]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<AccountUnmappedDetail>).detail;
+      if (detail?.type === "start_new_game" && "min" in detail && "max" in detail) {
+        doStartNewGame(detail.min, detail.max);
+      }
+    };
+    window.addEventListener("account-mapped", handler);
+    return () => window.removeEventListener("account-mapped", handler);
+  }, [doStartNewGame]);
 
   const handleSubmit = async () => {
     const minNumber = refMin.current?.value;
@@ -339,21 +291,7 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
       return;
     }
 
-    console.log("Start new game:", minNumber, "-", maxNumber);
-    setIsCreating(true);
-    
-    const txId = await startNewGameWithHistory(parseInt(minNumber), parseInt(maxNumber), () => {
-      refreshGame();
-      setIsCreating(false);
-      if (onGameCreated) {
-        onGameCreated();
-      }
-      toast.success(TOAST_MESSAGES.TRANSACTION_SUCCESS);
-    });
-
-    if (!txId) {
-      setIsCreating(false);
-    }
+    await doStartNewGame(parseInt(minNumber), parseInt(maxNumber));
   };
 
   if (compact) {
@@ -384,7 +322,7 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
             variant="outlined"
             type="number"
             size="small"
-            sx={{ flex: 1 }}
+            sx={{ flex: 1, ...textFieldSx }}
           />
           <TextField 
             inputRef={refMax} 
@@ -393,7 +331,7 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
             variant="outlined"
             type="number"
             size="small"
-            sx={{ flex: 1 }}
+            sx={{ flex: 1, ...textFieldSx }}
           />
           <Button 
             onClick={handleSubmit} 
@@ -410,7 +348,7 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
 
   if (isCreating) {
     return (
-      <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+      <Box sx={{ padding: "16px 24px 0 24px" }} display="flex" justifyContent="center">
         <div className="content-block fade-in" style={{
           display: 'flex',
           flexDirection: 'column',
@@ -428,7 +366,7 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
   }
 
   return (
-    <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+    <Box sx={{ padding: "16px 24px 0 24px" }} display="flex" justifyContent="center">
       <div className="content-block fade-in" style={{
         display: 'flex',
         flexDirection: 'column',
@@ -463,25 +401,25 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
         </p>
         <div className="new-game-inputs">
           <div className="input-group">
-            <label htmlFor="new-game-min-value">Minimum Number</label>
             <TextField 
               inputRef={refMin} 
               id="new-game-min-value" 
-              label="Min" 
+              label="Minimum"
               variant="outlined"
               type="number"
               fullWidth
+              sx={textFieldSx}
             />
           </div>
           <div className="input-group">
-            <label htmlFor="new-game-max-value">Maximum Number</label>
             <TextField 
               inputRef={refMax} 
               id="new-game-max-value" 
-              label="Max" 
+              label="Maximum"
               variant="outlined"
               type="number"
               fullWidth
+              sx={textFieldSx}
             />
           </div>
           <Button 
@@ -519,27 +457,110 @@ export function UnifiedGameInterfaceWithHistory() {
 }
 
 export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNewGame: () => void }) {
-  const { game, getAttempts, isGameCompleted } = useContext(GameContext);
+  const { game, getAttempts, isGameCompleted, reviveAddress, indexerGameInfo } = useContext(GameContext);
+  const [maxMaxAttempts, setMaxMaxAttempts] = useState<number | null>(null);
 
-  const renderAttemptResult = (attempt: Attempt): string => {
-    if (!attempt.clue) {
-      return `Attempt ${attempt.attemptNumber} - Waiting for the result for number ${attempt.guess}`;
+  const attempts = getAttempts();
+  const lastAttempt = attempts.find(a => a.attemptNumber === game.attempt);
+  const hasLastAttemptResult = lastAttempt?.clue != null;
+  const noAttemptsLeft = game.max_attempts != null && game.attempt >= game.max_attempts;
+  const showNoAttemptsLeft = noAttemptsLeft && (game.attempt === 0 || hasLastAttemptResult);
+
+  // Récupérer les données de l'indexer
+  const indexerGame: IndexerGame | null = indexerGameInfo?.data?.games?.[0] || null;
+  const guessHistory: GuessHistoryItem[] = useMemo(() => {
+    return indexerGame?.guessHistory || [];
+  }, [indexerGame, indexerGameInfo]);
+
+  useEffect(() => {
+    if (reviveAddress) {
+      fetchMaxMaxAttempts(reviveAddress.toLowerCase())
+        .then(setMaxMaxAttempts)
+        .catch((e) => {
+          console.error("Failed to fetch maxMaxAttempts:", e);
+          setMaxMaxAttempts(null);
+        });
+    } else {
+      setMaxMaxAttempts(null);
+    }
+  }, [reviveAddress]);
+
+  // Fusionner les tentatives on-chain avec l'historique de l'indexer
+  // Utiliser useMemo pour recalculer seulement quand les données changent
+  const getAllAttempts = useMemo((): Array<{ attemptNumber: number; guess: number; result: string | null; clue: Clue | undefined }> => {
+    const attemptsMap = new Map<number, { attemptNumber: number; guess: number; result: string | null; clue: Clue | undefined }>();
+    
+    // Priorité 1: Ajouter toutes les tentatives de l'indexer (historique complet)
+    // C'est la source de vérité principale pour l'historique
+    if (guessHistory.length > 0) {
+      guessHistory.forEach((item) => {
+        const clue = item.result === "Less" ? { type: "Less" as ClueType, value: undefined } :
+                     item.result === "More" ? { type: "More" as ClueType, value: undefined } :
+                     item.result === "Found" ? { type: "Found" as ClueType, value: undefined } :
+                     item.result === "Pending" ? undefined :
+                     undefined;
+        attemptsMap.set(item.attemptNumber, {
+          attemptNumber: item.attemptNumber,
+          guess: item.guess,
+          result: item.result,
+          clue
+        });
+      });
     }
     
-    switch (attempt.clue.type as ClueType) {
+    // Priorité 2: Ajouter/mettre à jour avec les tentatives on-chain (données les plus récentes)
+    // Seulement si on n'a pas déjà cette tentative dans l'indexer, ou si on a un résultat plus récent
+    attempts.forEach((attempt) => {
+      const existing = attemptsMap.get(attempt.attemptNumber);
+      // Mettre à jour si :
+      // - On n'a pas cette tentative dans l'indexer, OU
+      // - On a un résultat on-chain (clue) qui est plus récent
+      if (!existing || (attempt.clue && (!existing.clue || existing.result === "Pending"))) {
+        attemptsMap.set(attempt.attemptNumber, {
+          attemptNumber: attempt.attemptNumber,
+          guess: attempt.guess,
+          result: attempt.clue?.type || null,
+          clue: attempt.clue
+        });
+      }
+    });
+    
+    // Si on a des données de l'indexer, les utiliser en priorité
+    if (guessHistory.length > 0) {
+      return Array.from(attemptsMap.values()).sort((a, b) => a.attemptNumber - b.attemptNumber);
+    }
+    
+    // Sinon, utiliser les tentatives on-chain (fallback)
+    return attempts.map(attempt => ({
+      attemptNumber: attempt.attemptNumber,
+      guess: attempt.guess,
+      result: attempt.clue?.type || null,
+      clue: attempt.clue
+    })).sort((a, b) => a.attemptNumber - b.attemptNumber);
+  }, [guessHistory, attempts]);
+
+  const renderAttemptResult = (attemptNumber: number, guess: number, result: string | null, clue: Clue | undefined): string => {
+    if (!clue && result !== "Pending") {
+      return `Attempt ${attemptNumber} - Waiting for the result for number ${guess}`;
+    }
+    
+    const resultType = clue?.type || result;
+    switch (resultType) {
       case "Less":
-        return `Attempt ${attempt.attemptNumber} - My number is less than ${attempt.guess}`;
+        return `Attempt ${attemptNumber} - My number is less than ${guess}`;
       case "More":
-        return `Attempt ${attempt.attemptNumber} - My number is more than ${attempt.guess}`;
+        return `Attempt ${attemptNumber} - My number is more than ${guess}`;
       case "Found":
-        return `Attempt ${attempt.attemptNumber} - Congrats, you found the number ${attempt.guess}!`;
+        return `Attempt ${attemptNumber} - Congrats, you found the number ${guess}!`;
+      case "Pending":
+        return `Attempt ${attemptNumber} - Waiting for the result for number ${guess}`;
       default:
-        return "";
+        return `Attempt ${attemptNumber} - Guess: ${guess}`;
     }
   };
 
   return (
-    <Box sx={{ padding: "50px 40px 0 40px" }} display="flex" justifyContent="center">
+    <Box sx={{ padding: "16px 24px 0 24px" }} display="flex" justifyContent="center">
       <div className="content-block fade-in" style={{
         width: '100%',
         maxWidth: `${UI_CONFIG.GAME_MAX_WIDTH}px`,
@@ -548,7 +569,21 @@ export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNe
       }}>
         <div className="game-header">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-            <h3>Current Game</h3>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <h3>Current Game</h3>
+              {maxMaxAttempts != null && (
+                <Chip
+                  label={`NFT Max: ${maxMaxAttempts}`}
+                  size="small"
+                  sx={{
+                    backgroundColor: "rgba(var(--color-primary-rgb, 212, 175, 55), 0.15)",
+                    color: "var(--color-primary)",
+                    border: "1px solid rgba(var(--color-primary-rgb, 212, 175, 55), 0.3)",
+                    fontWeight: 600,
+                  }}
+                />
+              )}
+            </Box>
             {(!isGameCompleted || !isGameCompleted()) && (
               <Button 
                 onClick={onStartNewGame}
@@ -561,28 +596,66 @@ export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNe
               </Button>
             )}
           </div>
-          <p className="game-range">
-            Guess the number between <span className="highlight-number">{game.min_number}</span> and <span className="highlight-number">{game.max_number}</span>
-          </p>
+          {game.cancelled ? (
+            <p className="game-range" style={{ color: 'var(--color-warning)' }}>
+              Game cancelled
+            </p>
+          ) : (
+            <p className="game-range">
+              Guess the number between <span className="highlight-number">{game.min_number}</span> and <span className="highlight-number">{game.max_number}</span>
+              {game.max_attempts != null && (
+                <span style={{ marginLeft: 8, opacity: 0.9 }}>
+                  (max {game.max_attempts} attempts
+                  {game.max_attempts > 0 ? `, ${Math.max(0, game.max_attempts - game.attempt)} left` : ', no attempts left'}
+                  )
+                </span>
+              )}
+            </p>
+          )}
         </div>
         
         <div className="attempts-history">
           <h4>Attempts History</h4>
           <div className="attempts-list">
-            {getAttempts().map(attempt => (
-              <div key={attempt.attemptNumber} className="attempt-item">
-                <div className="attempt-number">Attempt {attempt.attemptNumber}</div>
-                <div className="attempt-result">
-                  {renderAttemptResult(attempt)}
+            {getAllAttempts.length > 0 ? (
+              getAllAttempts.map(attempt => (
+                <div key={attempt.attemptNumber} className="attempt-item">
+                  <div className="attempt-number">Attempt {attempt.attemptNumber}</div>
+                  <div className="attempt-result">
+                    {renderAttemptResult(attempt.attemptNumber, attempt.guess, attempt.result, attempt.clue)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="attempt-item">
+                <div className="attempt-result" style={{ opacity: 0.7 }}>
+                  No attempts yet
                 </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
         
-        <div className="make-guess-section">
-          <MakeGuessWithHistory onStartNewGame={onStartNewGame} />
-        </div>
+        {!game.cancelled && !noAttemptsLeft && (
+          <div className="make-guess-section">
+            <MakeGuessWithHistory onStartNewGame={onStartNewGame} />
+          </div>
+        )}
+        {!game.cancelled && noAttemptsLeft && !hasLastAttemptResult && (
+          <Box sx={{ p: 2, textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <Typography>Waiting for the result of your last guess...</Typography>
+          </Box>
+        )}
+        {!game.cancelled && showNoAttemptsLeft && (
+          <Box sx={{ p: 2, textAlign: 'center', color: 'var(--color-warning)' }}>
+            <Typography>No attempts left. Start a new game to continue.</Typography>
+            {onStartNewGame && (
+              <Button onClick={onStartNewGame} variant="contained" size="small" sx={{ mt: 2 }}>
+                New Game
+              </Button>
+            )}
+          </Box>
+        )}
       </div>
     </Box>
   );

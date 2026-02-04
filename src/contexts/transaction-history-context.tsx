@@ -212,8 +212,7 @@ export const TransactionHistoryProvider = ({ children }: TransactionHistoryProvi
               if (p && typeof p === 'object') {
                 if (p.game_number && typeof p.game_number === 'bigint' && p.game_number === gameNumber) return true;
                 if (p.min_number !== undefined || p.max_number !== undefined) {
-                  // start_new_game: associer le prochain ClueGiven/GuessMade au dernier start_new_game
-                  if (evt.eventType === 'guess_result' || evt.eventType === 'guess_submitted') return true;
+                  if (['guess_result', 'guess_submitted', 'game_cancelled', 'max_attempts_updated'].includes(evt.eventType)) return true;
                 }
               }
               return false;
@@ -221,6 +220,16 @@ export const TransactionHistoryProvider = ({ children }: TransactionHistoryProvi
 
           if (matchingTx) {
             addEventToTransaction(matchingTx.id, evt);
+            if (evt.eventType === 'game_cancelled' || evt.eventType === 'max_attempts_updated') {
+              const d = evt.data as any;
+              window.dispatchEvent(new CustomEvent('game-state-changed', {
+                detail: {
+                  gameNumber: d?.gameNumber,
+                  cancelled: evt.eventType === 'game_cancelled' ? true : undefined,
+                  maxAttempts: evt.eventType === 'max_attempts_updated' ? d?.maxAttempts : undefined
+                }
+              }));
+            }
           }
         } catch {}
       });
@@ -332,6 +341,16 @@ export const TransactionHistoryProvider = ({ children }: TransactionHistoryProvi
             ...tx,
             events: [...currentEvents, newEvent]
           };
+          if (newEvent.eventType === 'game_cancelled' || newEvent.eventType === 'max_attempts_updated') {
+            const d = newEvent.data as any;
+            window.dispatchEvent(new CustomEvent('game-state-changed', {
+              detail: {
+                gameNumber: d?.gameNumber,
+                cancelled: newEvent.eventType === 'game_cancelled' ? true : undefined,
+                maxAttempts: newEvent.eventType === 'max_attempts_updated' ? d?.maxAttempts : undefined
+              }
+            }));
+          }
           console.log(`📋 Transaction ${txId} now has ${updatedTx.events.length} events`);
           return updatedTx;
         }

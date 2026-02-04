@@ -17,9 +17,11 @@ export type Game = {
   game_number: bigint;
   min_number: number;
   max_number: number;
+  max_attempts?: number;
   attempt: number;
   last_guess: number | undefined;
   last_clue: Clue | undefined;
+  cancelled?: boolean;
 };
 
 // Game context types
@@ -29,6 +31,13 @@ export type GameContextType = {
   refreshGuesses: () => void;
   refreshGame: () => void;
   isGameCompleted: () => boolean;
+  /** 
+   * Données récupérées depuis l'indexeur GraphQL.
+   * Contient la réponse brute du serveur indexeur.
+   */
+  indexerGameInfo: any;
+  /** Adresse Revive (H160) du joueur connecté */
+  reviveAddress: string | null;
 };
 
 // UI component props
@@ -79,7 +88,7 @@ export interface GameEvent {
   id: string;
   timestamp: number;
   blockNumber?: number;
-  eventType: 'guess_submitted' | 'guess_result' | 'game_started' | 'game_over';
+  eventType: 'guess_submitted' | 'guess_result' | 'game_started' | 'game_over' | 'game_cancelled' | 'max_attempts_updated';
   data: {
     gameNumber?: bigint;
     attemptNumber?: number;
@@ -87,10 +96,11 @@ export interface GameEvent {
     result?: 'More' | 'Less' | 'Found';
     minNumber?: number;
     maxNumber?: number;
-    maxAttempts?: number; // V2: max_attempts dans NewGame
-    player?: string; // V2: player dans GuessMade, ClueGiven, GameOver
-    win?: boolean; // V2: win dans GameOver
-    target?: number; // V2: target dans GameOver
+    maxAttempts?: number;
+    player?: string;
+    win?: boolean;
+    target?: number;
+    cancelled?: boolean;
   };
   txHash?: string;
 }

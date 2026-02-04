@@ -105,7 +105,11 @@ export function useTransactionWithHistory() {
     try {
       const result = await contract.startNewGameWithHistory(signer, minNumber, maxNumber, callback, txId, chainId);
       console.log('Contract method returned:', result);
-      return result || txId;
+      if (result === null) {
+        updateTransaction(txId, { status: 'error', error: 'Account not mapped or operation aborted' });
+        return null;
+      }
+      return result;
     } catch (error) {
       console.error('Error in startNewGameWithHistory:', error);
       updateTransaction(txId, { 

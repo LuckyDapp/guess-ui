@@ -61,5 +61,8 @@
   --z-content: 1;
   --z-header: 1000;
   --z-modal: 2000;
+
+  /* Toast - marge sous le header */
+  --toast-top-offset: 64px;
 }
 

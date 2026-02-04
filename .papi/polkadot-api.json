@@ -3,14 +3,15 @@
   "descriptorPath": ".papi/descriptors",
   "entries": {
     "pah": {
-      "wsUrl": "wss://westend-asset-hub-rpc.polkadot.io",
+      "wsUrl": "wss://query.substrate.fi/guess-the-number-node",
       "metadata": ".papi/metadata/pah.scale",
-      "genesis": "0x67f9723393ef76214df0118c34bbbd3dbebc8ed46a10973a8c969d48fe7598c9",
-      "codeHash": "0x2f87cf2fa07ab6b64c43b97c282962a5d666391125220308a50588ba49f77316"
+      "genesis": "0x63516ad45ca098307b6ce7d1099f89d64af5801fee9fbc5c2f12c3a8df2eb4c8",
+      "codeHash": "0xba3be214cb2ac39087899b768e6d9e2de2bfb2adb9c61ab771388cfc13511413"
     }
   },
   "ink": {
     "guess_the_number_westend": ".papi/contracts/guess_the_number_westend.json",
-    "guess_the_number": ".papi/contracts/guess_the_number.json"
+    "guess_the_number": ".papi/contracts/guess_the_number.json",
+    "erc721": ".papi/contracts/erc721.json"
   }
 }

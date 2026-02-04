@@ -2,10 +2,12 @@ import type { GameEvent } from "./types";
 
 // Map des signatures d'événements Westend (premier topic) depuis le metadata
 const EVENT_SIGNATURES = {
-    '0xc8a7c5d86cdaf43555273e08a00e4cdaa93cf22046685231d5eb1b6c0d29fa92': 'NewGame', // Westend utilise signature V1
+    '0xc8a7c5d86cdaf43555273e08a00e4cdaa93cf22046685231d5eb1b6c0d29fa92': 'NewGame',
     '0x3db1630316e0f6c2b1c4274ba861a905acb84d336a2ba821871076503558da72': 'GameOver',
     '0x6fbbc2beca7d1247dbf89f89623d64c4431ae74cc6ec660f6ce708d846997769': 'ClueGiven',
-    '0xf5b23c2011134ba2467787da32da9ddda148939ab974db7735944b8ea67c3e5d': 'GuessMade'
+    '0xf5b23c2011134ba2467787da32da9ddda148939ab974db7735944b8ea67c3e5d': 'GuessMade',
+    '0xe1c579bb2a3625a2352da9d7e54506f12b7b582ceb069232e25005bddcbbbb21': 'GameCancelled',
+    '0x732f6678ce566a0ec18049af450298a2ebd0f38244d07ed84d01af908a9b6e20': 'MaxAttemptsUpdated'
 } as const;
 
 function decodeU128LittleEndian(bytes: Uint8Array, offset: number): bigint {
@@ -48,19 +50,19 @@ export const decodeContractEvent = (
         
         switch (eventType) {
             case 'NewGame': {
-                // Westend NewGame: game_number (u128, indexed), player (H160, indexed), min_number (u16), max_number (u16)
-                // Note: game_number et player sont dans les topics (indexed), donc on les lit depuis eventBytes
+                // NewGame: game_number (u128, indexed), player (H160, indexed), min_number (u16), max_number (u16), max_attempts? (u32)
                 const gameNumber = decodeU128LittleEndian(eventBytes, offset);
                 offset += 16;
-                
                 const player = decodeAddress(eventBytes, offset);
                 offset += 20;
-                
                 const minNumber = decodeU16LittleEndian(eventBytes, offset);
                 offset += 2;
-                
                 const maxNumber = decodeU16LittleEndian(eventBytes, offset);
-                
+                offset += 2;
+                let maxAttempts: number | undefined;
+                if (offset + 4 <= eventBytes.length) {
+                    maxAttempts = decodeU32LittleEndian(eventBytes, offset);
+                }
                 return {
                     eventType: 'game_started',
                     blockNumber: undefined,
@@ -68,6 +70,7 @@ export const decodeContractEvent = (
                         gameNumber,
                         minNumber,
                         maxNumber,
+                        maxAttempts,
                         player
                     },
                     txHash: undefined
@@ -131,6 +134,30 @@ export const decodeContractEvent = (
                 };
             }
             
+            case 'GameCancelled': {
+                const gameNumber = decodeU128LittleEndian(eventBytes, offset);
+                offset += 16;
+                const player = decodeAddress(eventBytes, offset);
+                return {
+                    eventType: 'game_cancelled',
+                    blockNumber: undefined,
+                    data: { gameNumber, player, cancelled: true },
+                    txHash: undefined
+                };
+            }
+            case 'MaxAttemptsUpdated': {
+                const gameNumber = decodeU128LittleEndian(eventBytes, offset);
+                offset += 16;
+                const player = decodeAddress(eventBytes, offset);
+                offset += 20;
+                const maxAttempts = decodeU32LittleEndian(eventBytes, offset);
+                return {
+                    eventType: 'max_attempts_updated',
+                    blockNumber: undefined,
+                    data: { gameNumber, player, maxAttempts },
+                    txHash: undefined
+                };
+            }
             case 'GameOver': {
                 // V2 GameOver: game_number (u128, indexed), player (H160, indexed), win (bool), target (u16)
                 const gameNumber = decodeU128LittleEndian(eventBytes, offset);

@@ -8,7 +8,7 @@ interface SkeletonLoaderProps {
 
 export function SkeletonLoader({ type, count = 1 }: SkeletonLoaderProps) {
   const renderGameSkeleton = () => (
-    <Box sx={{ padding: { xs: "30px 20px 0", sm: "50px 40px 0" }, display: 'flex', justifyContent: 'center' }}>
+    <Box sx={{ padding: { xs: "16px 20px 0", sm: "16px 24px 0" }, display: 'flex', justifyContent: 'center' }}>
       <Box
         sx={{
           width: '100%',
