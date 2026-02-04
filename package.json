@@ -4,7 +4,7 @@
   "description": "Guess The Number UI",
   "license": "Apache-2.0",
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "main": "src/index.tsx",
   "scripts": {
