@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Guess The Number UI",
   "license": "Apache-2.0",
+  "engines": {
+    "node": "18.x"
+  },
   "main": "src/index.tsx",
   "scripts": {
     "clean": "rm -rf dist .papi",
