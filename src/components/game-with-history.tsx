@@ -8,7 +8,8 @@ import type { Attempt, ClueType, Clue } from "../types.ts";
 import { ERROR_MESSAGES, TOAST_MESSAGES, UI_CONFIG } from "../config";
 import { useTransactionWithHistory } from "../hooks/use-transaction-with-history";
 import type { AccountUnmappedDetail } from "../contract";
-import { useQueryErrorResetter } from "@reactive-dot/react";
+import { useQueryErrorResetter, useSigner, useChainId } from "@reactive-dot/react";
+import { runPreFlightFaucetIfNeeded } from "../utils/preflight-faucet";
 import { fetchMaxMaxAttempts, type IndexerGame, type GuessHistoryItem } from "../services/token-indexer";
 
 /** Style commun pour tous les TextField (même rendu fluide que guess-number-value) */
@@ -108,6 +109,8 @@ function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' |
 export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () => void }) {
   const { game, refreshGuesses, getAttempts, isGameCompleted } = useContext(GameContext);
   const { makeGuessWithHistory } = useTransactionWithHistory();
+  const signer = useSigner();
+  const chainId = useChainId();
   const inputNumber = useRef<HTMLInputElement>(null);
   const [hasPendingAttempt, setHasPendingAttempt] = useState(false);
   const [guessStep, setGuessStep] = useState<'submitting' | 'finalizing' | 'syncing' | 'received' | 'idle'>('idle');
@@ -157,7 +160,9 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
     }
 
     setGuessStep('submitting');
-    
+    if (signer && chainId) {
+      await runPreFlightFaucetIfNeeded(chainId, signer);
+    }
     const txId = await makeGuessWithHistory(parseInt(guessNumber), () => {
       setGuessStep('syncing');
       refreshGuesses();
@@ -246,11 +251,16 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
 export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: { compact?: boolean; onGameCreated?: () => void; onBack?: () => void }) {
   const { refreshGame } = useContext(GameContext);
   const { startNewGameWithHistory } = useTransactionWithHistory();
+  const signer = useSigner();
+  const chainId = useChainId();
   const refMin = useRef<HTMLInputElement>(null);
   const refMax = useRef<HTMLInputElement>(null);
   const [isCreating, setIsCreating] = useState(false);
 
   const doStartNewGame = useCallback(async (minNumber: number, maxNumber: number) => {
+    if (signer && chainId) {
+      await runPreFlightFaucetIfNeeded(chainId, signer);
+    }
     setIsCreating(true);
     const txId = await startNewGameWithHistory(minNumber, maxNumber, () => {
       refreshGame();
@@ -259,7 +269,7 @@ export function NewGameWithHistory({ compact = false, onGameCreated, onBack }: {
       toast.success(TOAST_MESSAGES.TRANSACTION_SUCCESS);
     });
     if (!txId) setIsCreating(false);
-  }, [startNewGameWithHistory, refreshGame, onGameCreated]);
+  }, [startNewGameWithHistory, refreshGame, onGameCreated, signer, chainId]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -457,7 +467,7 @@ export function UnifiedGameInterfaceWithHistory() {
 }
 
 export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNewGame: () => void }) {
-  const { game, getAttempts, isGameCompleted, reviveAddress, indexerGameInfo } = useContext(GameContext);
+  const { game, getAttempts, isGameCompleted, reviveAddress, indexerGameInfo, gameOverTarget } = useContext(GameContext);
   const [maxMaxAttempts, setMaxMaxAttempts] = useState<number | null>(null);
 
   const attempts = getAttempts();
@@ -468,6 +478,7 @@ export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNe
 
   // Récupérer les données de l'indexer
   const indexerGame: IndexerGame | null = indexerGameInfo?.data?.games?.[0] || null;
+  const lostTarget = gameOverTarget ?? indexerGame?.target;
   const guessHistory: GuessHistoryItem[] = useMemo(() => {
     return indexerGame?.guessHistory || [];
   }, [indexerGame, indexerGameInfo]);
@@ -649,6 +660,9 @@ export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNe
         {!game.cancelled && showNoAttemptsLeft && (
           <Box sx={{ p: 2, textAlign: 'center', color: 'var(--color-warning)' }}>
             <Typography>No attempts left. Start a new game to continue.</Typography>
+            {lostTarget != null && (
+              <Typography sx={{ mt: 1, fontWeight: 600 }}>The number was {lostTarget}.</Typography>
+            )}
             {onStartNewGame && (
               <Button onClick={onStartNewGame} variant="contained" size="small" sx={{ mt: 2 }}>
                 New Game

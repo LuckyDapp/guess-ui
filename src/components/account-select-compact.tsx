@@ -5,6 +5,7 @@ import { Select, MenuItem, FormControl, Box, Typography } from "@mui/material";
 import { AccountCircle } from "@mui/icons-material";
 import { useSelectedAccount } from "../contexts/selected-account-context";
 import { useDevAccount } from "../contexts/dev-account-context";
+import { useAllWalletAccounts } from "../hooks/use-all-wallet-accounts";
 
 type AccountSelectCompactProps = {
     onAccountChange?: (account: WalletAccount) => void;
@@ -12,7 +13,9 @@ type AccountSelectCompactProps = {
 
 export function AccountSelectCompact({ onAccountChange }: AccountSelectCompactProps) {
     const connectedWallets = useConnectedWallets();
-    const accounts = useAccounts();
+    const accountsFilteredByChain = useAccounts();
+    const allWalletAccounts = useAllWalletAccounts();
+    const accounts = connectedWallets.length > 0 ? allWalletAccounts : accountsFilteredByChain;
     const { selectedAccount, setSelectedAccount, getStoredAccount, storeAccount } = useSelectedAccount();
     const devAccount = useDevAccount();
     const [selectedAccountIndex, setSelectedAccountIndex] = useState<number>(0);
@@ -178,25 +181,12 @@ export function AccountSelectCompact({ onAccountChange }: AccountSelectCompactPr
         );
     }
 
-    // Ne rien afficher si aucun wallet et pas de compte dev
+    // Ne rien afficher si aucun wallet connecté et pas de compte dev
     if (connectedWallets.length === 0 || accounts.length === 0) {
         return null;
     }
 
-    // Si un seul compte, l'afficher sans select
-    if (accounts.length === 1) {
-        const account = accounts[0];
-        return (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AccountCircle sx={{ color: '#d4af37', fontSize: 20 }} />
-                <Typography variant="body2" sx={{ color: '#fff', fontSize: '0.875rem' }}>
-                    {account.name || account.address.slice(0, 8) + '...'}
-                </Typography>
-            </Box>
-        );
-    }
-
-    // Afficher le select pour plusieurs comptes
+    // Wallet connecté : toujours afficher le select (un ou plusieurs comptes)
     const displayAccount = accounts[selectedAccountIndex] || selectedAccount;
 
     return (

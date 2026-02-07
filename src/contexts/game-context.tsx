@@ -68,7 +68,8 @@ export const GameContextProvider = ({ children }: GameContextProviderProps) => {
     const [attempts, setAttempts] = useState<Attempt[]>([]);
     const [nbNewGames, setNbNewGames] = useState(0);
     const [nbNewGuesses, setNbNewGuesses] = useState(0);
-const [indexerGameInfo, setIndexerGameInfo] = useState<any>(null);
+    const [indexerGameInfo, setIndexerGameInfo] = useState<any>(null);
+    const [gameOverTarget, setGameOverTarget] = useState<number | null>(null);
 
     // Memoization de l'adresse SS58 pour éviter les recalculs
     const ss58Address = useMemo(() => {
@@ -146,6 +147,11 @@ const [indexerGameInfo, setIndexerGameInfo] = useState<any>(null);
                             result
                           }
                         }
+                        gameOverEvents(where: {gameNumber_eq: $gameNumber}) {
+                          gameNumber
+                          target
+                          timestamp
+                        }
                       }
                     `;
                     
@@ -180,6 +186,12 @@ const [indexerGameInfo, setIndexerGameInfo] = useState<any>(null);
                                 return;
                             }
                             setIndexerGameInfo(data);
+                            const games = data?.data?.games;
+                            const idxGame = Array.isArray(games) ? games[0] : null;
+                            const overEvent = data?.data?.gameOverEvents?.[0];
+                            if (idxGame?.isOver === true && overEvent?.target != null) {
+                                setGameOverTarget(Number(overEvent.target));
+                            }
                             debugLog('Indexer data received');
                         })
                         .catch(err => {
@@ -299,6 +311,25 @@ const [indexerGameInfo, setIndexerGameInfo] = useState<any>(null);
         return () => window.removeEventListener('game-state-changed', handler);
     }, [refreshGame]);
 
+    const gameNumberRef = useRef<bigint | undefined>(game?.game_number);
+    gameNumberRef.current = game?.game_number;
+
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ gameNumber?: bigint; target?: number }>)?.detail;
+            if (detail?.gameNumber == null || detail?.target == null) return;
+            if (gameNumberRef.current != null && String(detail.gameNumber) === String(gameNumberRef.current)) {
+                setGameOverTarget(detail.target);
+            }
+        };
+        window.addEventListener('game-over', handler);
+        return () => window.removeEventListener('game-over', handler);
+    }, []);
+
+    useEffect(() => {
+        setGameOverTarget(null);
+    }, [game?.game_number]);
+
     const getAttempts =  () => {
         if (game == undefined || attempts==undefined){
             return [];
@@ -326,7 +357,7 @@ const [indexerGameInfo, setIndexerGameInfo] = useState<any>(null);
     }, [game, attempts]);
 
     return (
-        <GameContext.Provider value={{ game, getAttempts, refreshGuesses, refreshGame, isGameCompleted, indexerGameInfo, reviveAddress }} >
+        <GameContext.Provider value={{ game, getAttempts, refreshGuesses, refreshGame, isGameCompleted, indexerGameInfo, reviveAddress, gameOverTarget }} >
             {children}
         </GameContext.Provider>
     );

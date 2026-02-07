@@ -91,6 +91,8 @@ export type IndexerGame = {
   createdAtBlock: number;
   gameNumber: string;
   guessHistory: GuessHistoryItem[];
+  /** Cible (nombre à trouver), disponible quand la partie est terminée (game_over) */
+  target?: number;
 };
 
 export type GameQueryResult = {

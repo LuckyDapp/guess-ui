@@ -220,14 +220,19 @@ export const TransactionHistoryProvider = ({ children }: TransactionHistoryProvi
 
           if (matchingTx) {
             addEventToTransaction(matchingTx.id, evt);
+            const d = evt.data as any;
             if (evt.eventType === 'game_cancelled' || evt.eventType === 'max_attempts_updated') {
-              const d = evt.data as any;
               window.dispatchEvent(new CustomEvent('game-state-changed', {
                 detail: {
                   gameNumber: d?.gameNumber,
                   cancelled: evt.eventType === 'game_cancelled' ? true : undefined,
                   maxAttempts: evt.eventType === 'max_attempts_updated' ? d?.maxAttempts : undefined
                 }
+              }));
+            }
+            if (evt.eventType === 'game_over' && d?.win === false && d?.target != null) {
+              window.dispatchEvent(new CustomEvent('game-over', {
+                detail: { gameNumber: d.gameNumber, target: Number(d.target) }
               }));
             }
           }

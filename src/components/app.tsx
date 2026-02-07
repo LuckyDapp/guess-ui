@@ -1,11 +1,12 @@
 import {config} from "../config";
 import "../styles/globals.css";
-import {ChainProvider, ReactiveDotProvider, SignerProvider, useAccounts, useConnectedWallets} from "@reactive-dot/react";
+import {ChainProvider, ReactiveDotProvider, SignerProvider, useAccounts, useConnectedWallets, useWalletDisconnector} from "@reactive-dot/react";
+import { pending } from "@reactive-dot/core";
 import React, {Suspense, useState} from "react";
 import { createPortal } from "react-dom";
 import {ConnectionButton} from "dot-connect/react.js";
 import {ConnectionButtonAutoClose} from "./connection-button-auto-close.tsx";
-import {BlockchainGame} from "./blockchain-game.tsx";
+import { BlockchainGame, SiteFooter } from "./blockchain-game.tsx";
 
 
 import {Toaster} from "react-hot-toast";
@@ -16,6 +17,7 @@ import {AccountSelect} from "./account-select.tsx";
 import {DevAccountSelect} from "./dev-account-select.tsx";
 import {AccountSelectCompact} from "./account-select-compact.tsx";
 import {MapAccountPrompt} from "./map-account-prompt.tsx";
+import {BalanceCheckPrompt} from "./balance-check-prompt.tsx";
 import {SelectedAccountProvider} from "../contexts/selected-account-context.tsx";
 import {TransactionProvider} from "./transaction-provider.tsx";
 import {BlockchainLoader} from "./blockchain-loader.tsx";
@@ -59,21 +61,22 @@ export function App() {
                                         p: 3
                                     }}>
                                         <Alert severity="error" sx={{ maxWidth: '600px' }}>
-                                            <Typography variant="h6">Connection Failed</Typography>
-                                            <Typography variant="body2">
-                                                Unable to connect to PASETO network. Please check your internet connection and try again.
+                                            <Typography variant="h6">An error occurred</Typography>
+                                            <Typography variant="body2" sx={{ mt: 1, mb: 1 }}>
+                                                {error?.message || 'An unexpected error occurred. Please try again.'}
                                             </Typography>
-                                            <br/>
-                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                                                Error: {error?.message || 'Unknown error'}
-                                            </Typography>
+                                            {error?.stack && (
+                                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', mt: 1, color: 'rgba(255,255,255,0.7)' }}>
+                                                    {error.stack.split('\n').slice(0, 3).join('\n')}
+                                                </Typography>
+                                            )}
                                         </Alert>
                                         <Button
                                             variant="contained"
                                             onClick={resetErrorBoundary}
                                             startIcon={<Refresh />}
                                         >
-                                            Retry Connection
+                                            Retry
                                         </Button>
                                     </Box>
                                 )}
@@ -86,6 +89,7 @@ export function App() {
                                                 <SignerProvider signer={selectedAccount.polkadotSigner}>
                                                     <TransactionProvider>
                                                         <MapAccountPrompt />
+                                                        <BalanceCheckPrompt />
                                                         <HeaderWithConnection />
                                                         <TransactionHistoryProvider>
                                                             <GameContextProvider>
@@ -180,7 +184,10 @@ function AccountOrDevSelect({
     }
 
     return (
-        <DevAccountSelect>
+        <DevAccountSelect
+            header={<HeaderWithConnection />}
+            footer={<SiteFooter />}
+        >
             {(account) => renderContent(account)}
         </DevAccountSelect>
     );
@@ -191,7 +198,8 @@ function AccountOrDevSelect({
 function HeaderWithConnection() {
     const { currentTab, setCurrentTab } = useTabNavigation();
     const connectedWallets = useConnectedWallets();
-    
+    const [disconnectState, disconnectWallets] = useWalletDisconnector(connectedWallets);
+
     return (
         <Box sx={headerSx}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -237,11 +245,26 @@ function HeaderWithConnection() {
                     <Suspense fallback={<div>Loading...</div>}>
                         <AccountSelectCompact />
                     </Suspense>
-                    {/* Afficher le bouton Connect Wallet seulement si aucun wallet n'est connecté */}
-                    {connectedWallets.length === 0 && (
+                    {connectedWallets.length === 0 ? (
                         <Suspense fallback={<div>Loading...</div>}>
                             <ConnectionButtonAutoClose />
                         </Suspense>
+                    ) : (
+                        <Button
+                            variant="contained"
+                            size="small"
+                            disabled={disconnectState === pending}
+                            onClick={() => disconnectWallets()}
+                            sx={{
+                                backgroundColor: '#d4af37',
+                                color: '#000',
+                                '&:hover': {
+                                    backgroundColor: '#b8860b',
+                                },
+                            }}
+                        >
+                            {disconnectState === pending ? 'Disconnecting...' : 'Disconnect'}
+                        </Button>
                     )}
                 </Box>
             </Box>

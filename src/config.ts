@@ -90,6 +90,10 @@ export const NETWORK_CONFIG = {
   EXPLORER_URL: "https://polkadot.js.org/apps/",
   /** Squid indexer GraphQL endpoint for tokens */
   INDEXER_GRAPHQL_URL: "https://query2.substrate.fi/squid-guess/graphql",
+  /** Whether the chain exposes Balances pallet for in-app faucet (Eve transfer). Uses transferKeepAlive. */
+  FAUCET_AVAILABLE: true,
+  /** Native token decimals. Chain uses 12 (Substrate default). 100 UNIT = 100 * 10^12 raw. Must be >= ED. */
+  NATIVE_TOKEN_DECIMALS: 12,
 } as const;
 
 // ============================================================================

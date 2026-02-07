@@ -31,13 +31,15 @@ export type GameContextType = {
   refreshGuesses: () => void;
   refreshGame: () => void;
   isGameCompleted: () => boolean;
-  /** 
+  /**
    * Données récupérées depuis l'indexeur GraphQL.
    * Contient la réponse brute du serveur indexeur.
    */
   indexerGameInfo: any;
   /** Adresse Revive (H160) du joueur connecté */
   reviveAddress: string | null;
+  /** Cible du jeu en cours lorsque la partie est perdue (event game_over, win: false) */
+  gameOverTarget: number | null;
 };
 
 // UI component props

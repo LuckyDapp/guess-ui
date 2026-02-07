@@ -3,7 +3,8 @@ import { Box, Button, TextField, Typography, Chip } from "@mui/material";
 import { GameContext } from "../contexts/game-context.tsx";
 import { getContractAddress, gtnContract } from "../config.ts";
 import { toast } from "react-hot-toast";
-import { useContractMutation, useMutationEffect, useQueryErrorResetter, useChainId } from "@reactive-dot/react";
+import { useContractMutation, useMutationEffect, useQueryErrorResetter, useChainId, useSigner } from "@reactive-dot/react";
+import { runPreFlightFaucetIfNeeded } from "../utils/preflight-faucet";
 import { MutationError, pending } from "@reactive-dot/core";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import type { MutationEvent } from "@reactive-dot/react/src/contexts/mutation.tsx";
@@ -109,6 +110,7 @@ function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' |
 
 export function MakeGuess({ onStartNewGame }: { onStartNewGame?: () => void }) {
   const chainId = useChainId();
+  const signer = useSigner();
   const contractAddress = getContractAddress(chainId);
   const { game, refreshGuesses, getAttempts, isGameCompleted } = useContext(GameContext);
   const inputNumber = useRef<HTMLInputElement>(null);
@@ -169,6 +171,9 @@ export function MakeGuess({ onStartNewGame }: { onStartNewGame?: () => void }) {
     }
 
     setGuessStep('submitting');
+    if (signer && chainId) {
+      await runPreFlightFaucetIfNeeded(chainId, signer);
+    }
     makeGuess();
   };
 
@@ -275,6 +280,7 @@ export function MakeGuess({ onStartNewGame }: { onStartNewGame?: () => void }) {
 
 export function NewGame({ compact = false, onGameCreated, onBack }: { compact?: boolean; onGameCreated?: () => void; onBack?: () => void }) {
   const chainId = useChainId();
+  const signer = useSigner();
   const contractAddress = getContractAddress(chainId);
   const { refreshGame } = useContext(GameContext);
   const refMin = useRef<HTMLInputElement>(null);
@@ -317,6 +323,9 @@ export function NewGame({ compact = false, onGameCreated, onBack }: { compact?: 
       return;
     }
 
+    if (signer && chainId) {
+      await runPreFlightFaucetIfNeeded(chainId, signer);
+    }
     setIsCreating(true);
     newGame();
   };
@@ -512,7 +521,7 @@ export function UnifiedGameInterface() {
 }
 
 export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () => void }) {
-  const { game, getAttempts, isGameCompleted, reviveAddress, indexerGameInfo } = useContext(GameContext);
+  const { game, getAttempts, isGameCompleted, reviveAddress, indexerGameInfo, gameOverTarget } = useContext(GameContext);
   const [maxMaxAttempts, setMaxMaxAttempts] = useState<number | null>(null);
 
   const attempts = getAttempts();
@@ -523,6 +532,7 @@ export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () 
 
   // Récupérer les données de l'indexer
   const indexerGame: IndexerGame | null = indexerGameInfo?.data?.games?.[0] || null;
+  const lostTarget = gameOverTarget ?? indexerGame?.target;
   const guessHistory: GuessHistoryItem[] = useMemo(() => {
     return indexerGame?.guessHistory || [];
   }, [indexerGame, indexerGameInfo]);
@@ -704,6 +714,9 @@ export function CurrentGameWithAbandon({ onStartNewGame }: { onStartNewGame: () 
         {!game.cancelled && showNoAttemptsLeft && (
           <Box sx={{ p: 2, textAlign: 'center', color: 'var(--color-warning)' }}>
             <Typography>No attempts left. Start a new game to continue.</Typography>
+            {lostTarget != null && (
+              <Typography sx={{ mt: 1, fontWeight: 600 }}>The number was {lostTarget}.</Typography>
+            )}
             {onStartNewGame && (
               <Button onClick={onStartNewGame} variant="contained" size="small" sx={{ mt: 2 }}>
                 New Game

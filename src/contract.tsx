@@ -10,6 +10,9 @@ import {type Observer} from "rxjs"
 import {getContractAddress, getRpc} from "./config.ts";
 import type { TransactionHistory, GameEvent, Game } from "./types";
 import { processBlockEvents } from "./block-event-processor";
+import { Keyring } from "@polkadot/keyring";
+import { getPolkadotSigner } from "polkadot-api/signer";
+import { ApiPromise, WsProvider } from "@polkadot/api";
 
 /** Normalize contract response (camelCase or snake_case) to Game type */
 function normalizeGameResponse(raw: any): Game | null {
@@ -91,11 +94,13 @@ export class MyContract {
 
     contract: any
     private typedApi: any
+    private rpc: string
 
     constructor(
         rpc: string,
         address: string,
     ) {
+        this.rpc = rpc;
         const client = createClient(withPolkadotSdkCompat(getWsProvider(rpc)))
         const typedApi = client.getTypedApi(pah)
         this.typedApi = typedApi;
@@ -130,6 +135,72 @@ export class MyContract {
             });
         } catch (err) {
             toast.error("Map account error: " + (err instanceof Error ? err.message : String(err)));
+            return false;
+        }
+    }
+
+    /** Vérifie le solde d'un compte Substrate */
+    async getAccountBalance(address: string): Promise<bigint> {
+        try {
+            const accountInfo = await this.typedApi.query.System.Account.getValue(address);
+            // Le solde disponible peut être dans différentes structures selon la version de Substrate
+            // Essayer plusieurs chemins possibles
+            let free = 0n;
+            if (accountInfo) {
+                if (accountInfo.data?.free) {
+                    free = accountInfo.data.free;
+                } else if (accountInfo.free) {
+                    free = accountInfo.free;
+                } else if ((accountInfo as any).data?.free) {
+                    free = (accountInfo as any).data.free;
+                }
+            }
+            return typeof free === 'bigint' ? free : BigInt(free || 0);
+        } catch (err) {
+            console.error("Error getting account balance:", err);
+            return 0n;
+        }
+    }
+
+    /** Transfère des tokens depuis Eve vers un compte (via @polkadot/api ; montant doit être >= existential deposit). */
+    async transferFromEve(destination: string | Uint8Array, amount: bigint): Promise<boolean> {
+        const keyring = new Keyring({ type: "sr25519", ss58Format: 42 });
+        const evePair = keyring.createFromUri("//Eve", { name: "Eve" });
+        try {
+            const provider = new WsProvider(this.rpc);
+            const api = await ApiPromise.create({ provider });
+            const chainPrefix = api.registry.chainSS58 ?? 42;
+            const destAddress =
+                typeof destination === "string"
+                    ? destination
+                    : encodeAddress(destination, chainPrefix);
+            const tx = api.tx.balances.transferKeepAlive(destAddress, amount);
+            return new Promise((resolve) => {
+                let unsub: (() => void) | null = null;
+                const done = (success: boolean) => {
+                    if (unsub) unsub();
+                    api.disconnect().catch(() => {});
+                    resolve(success);
+                };
+                tx.signAndSend(evePair, { nonce: -1 }, (result) => {
+                    if (!result.status.isFinalized) return;
+                    if ((result as any).dispatchError) {
+                        toast.error("Transfer failed: " + String((result as any).dispatchError));
+                        done(false);
+                        return;
+                    }
+                    toast.success("Transferred tokens from Eve successfully!");
+                    done(true);
+                })
+                    .then((u) => { unsub = u; })
+                    .catch((err: unknown) => {
+                        toast.error("Transfer error: " + (err instanceof Error ? err.message : String(err)));
+                        done(false);
+                    });
+            });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            toast.error("Transfer error: " + msg);
             return false;
         }
     }

@@ -30,6 +30,7 @@ export function MapAccountPrompt() {
         const detail = pendingActionRef.current;
         setOpen(false);
         if (typeof window !== "undefined" && detail) {
+          // Déclencher l'événement account-mapped qui ouvrira la modale de vérification du solde
           window.dispatchEvent(new CustomEvent("account-mapped", { detail }));
         }
         pendingActionRef.current = null;
