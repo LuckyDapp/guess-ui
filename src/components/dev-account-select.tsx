@@ -165,12 +165,14 @@ export function DevAccountSelect({
   const cardSx = {
     p: 3,
     borderRadius: 2,
-    border: "1px solid rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.2)",
     height: "100%",
     display: "flex",
     flexDirection: "column",
     alignItems: "stretch",
+    background: "linear-gradient(135deg, rgba(32, 33, 37, 0.3) 0%, rgba(25, 27, 31, 0.3) 100%)",
+    backdropFilter: "blur(10px)",
+    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
   };
 
   const formContent = (
@@ -285,6 +287,91 @@ export function DevAccountSelect({
           <Typography variant="caption" sx={{ color: "#888", mt: 2, display: "block", fontSize: "0.95rem" }}>
             💡 For dev mode, we recommend using only Polkadot.js
           </Typography>
+        </Box>
+      </Box>
+
+      {/* Configuration RPC */}
+      <Box
+        sx={{
+          mt: 3,
+          p: 2.5,
+          borderRadius: 2,
+          border: "1px solid rgba(255,255,255,0.2)",
+          background: "linear-gradient(135deg, rgba(32, 33, 37, 0.3) 0%, rgba(25, 27, 31, 0.3) 100%)",
+          backdropFilter: "blur(10px)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
+        }}
+      >
+        <Typography variant="h6" sx={{ color: "#d4af37", mb: 2, fontSize: "1.1rem" }}>
+          ⚙️ RPC Configuration
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)" },
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography variant="caption" sx={{ color: "#888", fontSize: "0.85rem", display: "block", mb: 0.5 }}>
+              RPC URL
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#b0b0b0", fontSize: "0.9rem", wordBreak: "break-all" }}>
+              {getRpc("pah")}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: "#888", fontSize: "0.85rem", display: "block", mb: 0.5 }}>
+              Token Decimals
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#b0b0b0", fontSize: "0.9rem" }}>
+              {NETWORK_CONFIG.NATIVE_TOKEN_DECIMALS}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: "#888", fontSize: "0.85rem", display: "block", mb: 0.5 }}>
+              Native Token Symbol
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#b0b0b0", fontSize: "0.9rem" }}>
+              UNIT
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: "#888", fontSize: "0.85rem", display: "block", mb: 0.5 }}>
+              Testnet
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#4caf50", fontSize: "0.9rem" }}>
+              Yes (Dev Mode)
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: "#888", fontSize: "0.85rem", display: "block", mb: 0.5 }}>
+              Platform
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#b0b0b0", fontSize: "0.9rem" }}>
+              Substrate
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: "#888", fontSize: "0.85rem", display: "block", mb: 0.5 }}>
+              Explorer
+            </Typography>
+            <Typography
+              component="a"
+              href={`https://polkadot.js.org/apps/?rpc=${encodeURIComponent(getRpc("pah"))}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="body2"
+              sx={{
+                color: "#d4af37",
+                fontSize: "0.9rem",
+                textDecoration: "none",
+                "&:hover": { textDecoration: "underline" },
+              }}
+            >
+              Polkadot.js Apps
+            </Typography>
+          </Box>
         </Box>
       </Box>
     </Box>

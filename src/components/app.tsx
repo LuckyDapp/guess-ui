@@ -155,8 +155,9 @@ const headerSx = {
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#1a1a1a',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'linear-gradient(135deg, rgba(32, 33, 37, 0.3) 0%, rgba(25, 27, 31, 0.3) 100%)',
+    backdropFilter: 'blur(10px)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
     zIndex: 10000,
     padding: '8px 24px',
     display: 'flex',
@@ -164,6 +165,7 @@ const headerSx = {
     alignItems: 'center',
     gap: 2,
     minHeight: '56px',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
 };
 
 /** Choisit AccountSelect (wallet), DevAccountSelect (comptes dev), ou message de connexion */
