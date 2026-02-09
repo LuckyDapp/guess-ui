@@ -71,36 +71,155 @@ function GameCreationLoader({ step }: { step: 'submitting' | 'finalizing' | 'syn
   );
 }
 
-// Inline status for guess submission
+// Inline status for guess submission - Version alternative avec barre de progression
 function GuessStatus({ step }: { step: 'submitting' | 'finalizing' | 'syncing' | 'received' }) {
+  // Fusionner submitting et finalizing en une seule étape
+  const getStepIndex = () => {
+    if (step === 'submitting' || step === 'finalizing') return 0;
+    if (step === 'syncing') return 1;
+    if (step === 'received') return 2;
+    return 0;
+  };
+
+  const currentStepIndex = getStepIndex();
+  const steps = [
+    { label: 'Submitting transaction', key: 'submitting' },
+    { label: 'Waiting for guess results', key: 'syncing' },
+    { label: 'Guess received', key: 'received' },
+  ];
+
   return (
     <Box sx={{ 
-      textAlign: 'left', 
-      p: 2,
+      textAlign: 'center', 
+      p: 3,
       background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(184, 134, 11, 0.05) 100%)',
       borderRadius: 'var(--radius-lg)',
       border: '1px solid rgba(212, 175, 55, 0.25)'
     }}>
       <Typography variant="subtitle1" sx={{ 
         color: 'var(--color-primary)', 
-        mb: 1,
+        mb: 3,
         fontFamily: 'var(--font-heading)'
       }}>
         🎯 Processing your guess
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minHeight: '72px' }}>
-        <Typography variant="body2" sx={{ color: step === 'submitting' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'submitting' ? 700 : 500 }}>
-          {step === 'submitting' ? '• Submitting transaction' : '○ Submitting transaction'}
-        </Typography>
-        <Typography variant="body2" sx={{ color: step === 'finalizing' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'finalizing' ? 700 : 500 }}>
-          {step === 'finalizing' ? '• Waiting for finalization' : '○ Waiting for finalization'}
-        </Typography>
-        <Typography variant="body2" sx={{ color: step === 'syncing' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'syncing' ? 700 : 500 }}>
-          {step === 'syncing' ? '• Waiting for guess results' : '○ Waiting for guess results'}
-        </Typography>
-        <Typography variant="body2" sx={{ color: step === 'received' ? 'var(--color-primary)' : 'var(--text-secondary)', fontWeight: step === 'received' ? 700 : 500 }}>
-          {step === 'received' ? '• Guess received and processed' : '○ Guess received and processed'}
-        </Typography>
+      
+      {/* Barre de progression avec cercles */}
+      <Box sx={{ 
+        position: 'relative',
+        width: '100%',
+        maxWidth: '450px',
+        mb: 3,
+        px: 2,
+      }}>
+        {/* Ligne horizontale de connexion */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 10,
+            left: '10%',
+            right: '10%',
+            height: 2,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            zIndex: 0,
+          }}
+        />
+        {/* Ligne complétée */}
+        {currentStepIndex > 0 && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 10,
+              left: '10%',
+              width: `${((currentStepIndex) / (steps.length - 1)) * 80}%`,
+              height: 2,
+              backgroundColor: 'var(--color-primary)',
+              zIndex: 1,
+              transition: 'width 0.3s ease',
+            }}
+          />
+        )}
+        
+        {/* Grille avec cercles et labels */}
+        <Box sx={{ 
+          display: 'grid',
+          gridTemplateColumns: `repeat(${steps.length}, 1fr)`,
+          position: 'relative',
+          zIndex: 2,
+        }}>
+          {steps.map((stepItem, index) => {
+            const isActive = index === currentStepIndex;
+            const isCompleted = index < currentStepIndex;
+            const isReceived = index === steps.length - 1 && step === 'received';
+            
+            return (
+              <Box
+                key={stepItem.key}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                {/* Cercle ou coche */}
+                <Box
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: '50%',
+                    border: `2px solid ${isActive || isCompleted ? 'var(--color-primary)' : 'rgba(255,255,255,0.3)'}`,
+                    backgroundColor: isReceived ? '#4caf50' : (isActive || isCompleted ? 'var(--color-primary)' : 'transparent'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.3s ease',
+                    mb: 1.5,
+                  }}
+                >
+                  {isReceived ? (
+                    <Box
+                      component="svg"
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        stroke: '#fff',
+                        strokeWidth: 2.5,
+                        strokeLinecap: 'round',
+                        strokeLinejoin: 'round',
+                        fill: 'none',
+                      }}
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M5 13l4 4L19 7" />
+                    </Box>
+                  ) : isActive ? (
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: '#000',
+                      }}
+                    />
+                  ) : null}
+                </Box>
+                
+                {/* Label */}
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: isActive || isCompleted ? (isReceived ? '#4caf50' : 'var(--color-primary)') : 'var(--text-secondary)',
+                    fontSize: '0.75rem',
+                    textAlign: 'center',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {stepItem.label}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Box>
       </Box>
     </Box>
   );
@@ -114,17 +233,31 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
   const inputNumber = useRef<HTMLInputElement>(null);
   const [hasPendingAttempt, setHasPendingAttempt] = useState(false);
   const [guessStep, setGuessStep] = useState<'submitting' | 'finalizing' | 'syncing' | 'received' | 'idle'>('idle');
+  const [expectedAttemptNumber, setExpectedAttemptNumber] = useState<number | null>(null);
 
-  // Check for pending attempts
+  // Check for pending attempts - vérifier spécifiquement la tentative attendue
   useEffect(() => {
+    if (guessStep !== 'syncing' || expectedAttemptNumber === null) {
+      return;
+    }
+
     const checkPendingAttempts = () => {
       try {
         const attempts = getAttempts();
+        // Vérifier spécifiquement que la tentative attendue a un clue
+        const expectedAttempt = attempts.find(attempt => attempt.attemptNumber === expectedAttemptNumber);
+        const hasClue = expectedAttempt?.clue !== undefined && expectedAttempt.clue !== null;
+        
         const hasPending = Array.isArray(attempts) && attempts.some(attempt => !attempt.clue);
         setHasPendingAttempt(hasPending);
-        if (!hasPending && guessStep === 'syncing') {
+        
+        // Ne passer à 'received' que si la tentative attendue a bien un clue
+        if (hasClue && guessStep === 'syncing') {
           setGuessStep('received');
-          setTimeout(() => setGuessStep('idle'), 2000);
+          setTimeout(() => {
+            setGuessStep('idle');
+            setExpectedAttemptNumber(null);
+          }, 1000);
         }
       } catch (error) {
         console.warn('Error checking pending attempts:', error);
@@ -135,7 +268,7 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
     checkPendingAttempts();
     const interval = setInterval(checkPendingAttempts, 1000);
     return () => clearInterval(interval);
-  }, [getAttempts, guessStep]);
+  }, [getAttempts, guessStep, expectedAttemptNumber]);
 
   const handleSubmit = async () => {
     const guessNumber = inputNumber.current?.value;
@@ -154,7 +287,8 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
       toast.error("🎉 Congratulations! You found the number! The game is complete.");
       return;
     }
-    if (game && game.max_attempts != null && game.attempt >= game.max_attempts) {
+    // Ne pas bloquer si on a gagné, même si on a atteint max_attempts
+    if (game && game.max_attempts != null && game.attempt >= game.max_attempts && !(isGameCompleted && isGameCompleted())) {
       toast.error("No attempts left. Start a new game to continue.");
       return;
     }
@@ -163,7 +297,12 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
     if (signer && chainId) {
       await runPreFlightFaucetIfNeeded(chainId, signer);
     }
+    // Définir le numéro d'essai attendu avant de soumettre
+    const expectedAttempt = game ? (game.attempt || 0) + 1 : null;
     const txId = await makeGuessWithHistory(parseInt(guessNumber), () => {
+      if (expectedAttempt !== null) {
+        setExpectedAttemptNumber(expectedAttempt);
+      }
       setGuessStep('syncing');
       refreshGuesses();
       toast.success(TOAST_MESSAGES.TRANSACTION_SUCCESS);
@@ -173,6 +312,7 @@ export function MakeGuessWithHistory({ onStartNewGame }: { onStartNewGame?: () =
       setGuessStep('finalizing');
     } else {
       setGuessStep('idle');
+      setExpectedAttemptNumber(null);
     }
   };
 
@@ -473,8 +613,10 @@ export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNe
   const attempts = getAttempts();
   const lastAttempt = attempts.find(a => a.attemptNumber === game.attempt);
   const hasLastAttemptResult = lastAttempt?.clue != null;
+  const gameIsCompleted = isGameCompleted && isGameCompleted();
   const noAttemptsLeft = game.max_attempts != null && game.attempt >= game.max_attempts;
-  const showNoAttemptsLeft = noAttemptsLeft && (game.attempt === 0 || hasLastAttemptResult);
+  // Ne pas afficher "No attempts left" si le jeu est complété (gagné)
+  const showNoAttemptsLeft = noAttemptsLeft && (game.attempt === 0 || hasLastAttemptResult) && !gameIsCompleted;
 
   // Récupérer les données de l'indexer
   const indexerGame: IndexerGame | null = indexerGameInfo?.data?.games?.[0] || null;
@@ -647,17 +789,42 @@ export function CurrentGameWithAbandonAndHistory({ onStartNewGame }: { onStartNe
           </div>
         </div>
         
-        {!game.cancelled && !noAttemptsLeft && (
+        {!game.cancelled && gameIsCompleted && (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="h5" sx={{ color: 'success.main', fontWeight: 'bold', mb: 2 }}>
+              🎉 Congratulations!
+            </Typography>
+            <Typography variant="h6" sx={{ color: 'text.secondary', mb: 3 }}>
+              You found the number! The game is complete.
+            </Typography>
+            {onStartNewGame && (
+              <Button 
+                onClick={onStartNewGame}
+                variant="contained"
+                color="primary"
+                size="large"
+                sx={{ 
+                  minWidth: '200px',
+                  fontWeight: 'bold',
+                  fontSize: '1.1rem'
+                }}
+              >
+                Start a new game
+              </Button>
+            )}
+          </Box>
+        )}
+        {!game.cancelled && !gameIsCompleted && !noAttemptsLeft && (
           <div className="make-guess-section">
             <MakeGuessWithHistory onStartNewGame={onStartNewGame} />
           </div>
         )}
-        {!game.cancelled && noAttemptsLeft && !hasLastAttemptResult && (
-          <Box sx={{ p: 2, textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <Typography>Waiting for the result of your last guess...</Typography>
-          </Box>
+        {!game.cancelled && !gameIsCompleted && noAttemptsLeft && !hasLastAttemptResult && (
+          <div className="make-guess-section">
+            <MakeGuessWithHistory onStartNewGame={onStartNewGame} />
+          </div>
         )}
-        {!game.cancelled && showNoAttemptsLeft && (
+        {!game.cancelled && !gameIsCompleted && showNoAttemptsLeft && (
           <Box sx={{ p: 2, textAlign: 'center', color: 'var(--color-warning)' }}>
             <Typography>No attempts left. Start a new game to continue.</Typography>
             {lostTarget != null && (
